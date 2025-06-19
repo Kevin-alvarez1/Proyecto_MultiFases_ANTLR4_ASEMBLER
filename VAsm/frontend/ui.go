@@ -300,9 +300,28 @@ func BuildMainWindow(win fyne.Window) *Editor {
 					texto += fmt.Sprintf("%v ", v)
 				}
 				texto = strings.TrimSpace(texto)
-				editor.ConsoleLabel.SetText(fmt.Sprintf("Análisis completado\n%s", output))
+				editor.ConsoleLabel.SetText(fmt.Sprintf("%s", output))
+				err = os.MkdirAll("assembler", os.ModePerm)
+				if err != nil {
+					log.Println("Error creando carpeta 'assembler':", err)
+					return
+				}
+
+				archivo := filepath.Join("assembler", "program.s")
+				file, err := os.Create(archivo)
+				if err != nil {
+					log.Println("Error creando archivo program.s:", err)
+					return
+				}
+				defer file.Close()
+
+				_, err = file.WriteString(editor.ConsoleLabel.Text)
+				if err != nil {
+					log.Println("Error escribiendo en archivo program.s:", err)
+					return
+				}
 			} else {
-				editor.ConsoleLabel.SetText(fmt.Sprintf("Análisis completado\n%s", output))
+				editor.ConsoleLabel.SetText(fmt.Sprintf("%s", output))
 			}
 		}),
 	)
