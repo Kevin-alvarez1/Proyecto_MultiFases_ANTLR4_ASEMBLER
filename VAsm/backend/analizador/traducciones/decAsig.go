@@ -42,27 +42,16 @@ func ProcesarDeclaracionMultiple(
 func generarCodigoDeclaracion(id, tipo string, valor interface{}, outputASM *strings.Builder) {
 	switch val := valor.(type) {
 	case int:
-		codigo := fmt.Sprintf("// Declaración %s de tipo %s\nmov x0, #%d\n\n", id, tipo, val)
-		outputASM.WriteString(codigo)
+		generarCodigoInt(id, val, outputASM)
 
 	case float64:
-		// AArch64 no soporta mover float inmediato directamente, se necesita cargar desde memoria,
-		codigo := fmt.Sprintf("// Declaración %s de tipo %s (float64) valor: %f\n", id, tipo, val)
-		outputASM.WriteString(codigo)
+		generarCodigoFloat(id, val, outputASM)
 
 	case bool:
-		var boolVal int
-		if val {
-			boolVal = 1
-		} else {
-			boolVal = 0
-		}
-		codigo := fmt.Sprintf("// Declaración %s de tipo %s\nmov x0, #%d // bool\n\n", id, tipo, boolVal)
-		outputASM.WriteString(codigo)
+		generarCodigoBool(id, val, outputASM)
 
 	case string:
-		// Generar impresión usando la función para prints
-		GenerarCodigoPrint(val, false)
+		generarCodigoString(id, val, outputASM)
 
 	case []interface{}:
 		// Para slices, solo mostramos comentario con contenido
@@ -79,6 +68,42 @@ func generarCodigoDeclaracion(id, tipo string, valor interface{}, outputASM *str
 	default:
 		outputASM.WriteString(fmt.Sprintf("// %s: tipo no soportado para ASM (%T)\n", id, val))
 	}
+}
+
+func GenerarCodigoDeclaracionSinTipo(id, tipo string, valor interface{}, outputASM *strings.Builder) error {
+	switch tipo {
+	case "int":
+		val, ok := valor.(int)
+		if !ok {
+			return fmt.Errorf("Valor para variable %s no es int", id)
+		}
+		generarCodigoInt(id, val, outputASM)
+
+	case "float", "float64":
+		val, ok := valor.(float64)
+		if !ok {
+			return fmt.Errorf("Valor para variable %s no es float64", id)
+		}
+		generarCodigoFloat(id, val, outputASM)
+
+	case "string":
+		val, ok := valor.(string)
+		if !ok {
+			return fmt.Errorf("Valor para variable %s no es string", id)
+		}
+		generarCodigoString(id, val, outputASM)
+
+	case "bool":
+		val, ok := valor.(bool)
+		if !ok {
+			return fmt.Errorf("Valor para variable %s no es bool", id)
+		}
+		generarCodigoBool(id, val, outputASM)
+
+	default:
+		return fmt.Errorf("Tipo %s no soportado para generación ASM", tipo)
+	}
+	return nil
 }
 
 func inferirTipo(valor interface{}) string {
@@ -129,4 +154,35 @@ func extraerTipoInterno(tipo string) string {
 		return tipo[6 : len(tipo)-1]
 	}
 	return tipo
+}
+
+func generarCodigoInt(id string, valor int, outputASM *strings.Builder) {
+	// Comentario y código ASM que mueve el valor al registro x0 (puedes adaptar si quieres más lógica)
+	codigo := fmt.Sprintf("mov x0, #%d\n\n", valor)
+	outputASM.WriteString(codigo)
+}
+
+func generarCodigoFloat(id string, val float64, outputASM *strings.Builder) {
+	etiqueta := fmt.Sprintf("float_val_%s", id)
+
+	dataBuilder.WriteString(fmt.Sprintf("%s: .float %f\n", etiqueta, val))
+
+	textBuilder.WriteString(fmt.Sprintf("ldr s0, =%s\n", etiqueta))
+
+}
+func generarCodigoString(id string, valor string, outputASM *strings.Builder) {
+	etiqueta := id
+	escaped := escape(valor)
+
+	// Solo en .data
+	dataBuilder.WriteString(fmt.Sprintf("%s: .ascii \"%s\"\n", etiqueta, escaped))
+}
+
+func generarCodigoBool(id string, val bool, outputASM *strings.Builder) {
+	bit := 0
+	if val {
+		bit = 1
+	}
+	codigo := fmt.Sprintf("mov x0, #%d\n\n", bit)
+	outputASM.WriteString(codigo)
 }

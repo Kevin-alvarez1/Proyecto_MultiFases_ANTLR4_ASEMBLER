@@ -15,6 +15,7 @@ import (
 
 type EvalVisitor struct {
 	*parser.BasegramaticaVisitor
+	Entorno   map[string]interface{}
 	Console   *strings.Builder
 	OutputASM strings.Builder
 	Tabla     *symbols.TablaSimbolos
@@ -25,6 +26,7 @@ func NewEvalVisitor(tabla *symbols.TablaSimbolos) *EvalVisitor {
 		BasegramaticaVisitor: &parser.BasegramaticaVisitor{},
 		Tabla:                tabla,
 		Console:              &strings.Builder{},
+		Entorno:              make(map[string]interface{}),
 	}
 }
 
@@ -71,6 +73,12 @@ func (v *EvalVisitor) VisitInstruccion(ctx *parser.InstruccionContext) interface
 	if ctx.DeclaracionMultiple() != nil {
 		return v.Visit(ctx.DeclaracionMultiple())
 	}
+	if ctx.DeclaracionMultipleSimple() != nil {
+		return v.Visit(ctx.DeclaracionMultipleSimple())
+	}
+	if ctx.DeclaracionMultipleSinTipo() != nil {
+		return v.Visit(ctx.DeclaracionMultipleSinTipo())
+	}
 	return nil
 }
 
@@ -79,7 +87,6 @@ func (v *EvalVisitor) VisitDeclaracionMultiple(ctx *parser.DeclaracionMultipleCo
 	tipo := ctx.Tipos().GetText()
 	valores := obtenerValores(ctx.ListaExpr(), v)
 	ids := obtenerIDs(ctx.ListaIDS())
-	fmt.Printf("Valores obtenidos: %v\n", valores)
 
 	if len(ids) != len(valores) {
 		msg := fmt.Sprintf("Error: cantidad de variables (%d) no coincide con valores (%d)",
@@ -88,8 +95,95 @@ func (v *EvalVisitor) VisitDeclaracionMultiple(ctx *parser.DeclaracionMultipleCo
 		return nil
 	}
 
+	for _, id := range ids {
+		if yaDeclaradoEnAmbitoActual(id, tipo, v.Tabla) {
+			msg := fmt.Sprintf("Error: variable '%s' ya fue declarada con otro tipo en este ámbito", id)
+			v.Tabla.Errores.NewSemanticError(ctx.GetStart(), msg)
+			return nil
+		}
+	}
+
 	if err := traducciones.ProcesarDeclaracionMultiple(ids, valores, tipo, v.Tabla, &v.OutputASM); err != nil {
 		v.Tabla.Errores.NewSemanticError(ctx.GetStart(), err.Error())
+	}
+	return nil
+}
+
+func (v *EvalVisitor) VisitDeclaracionMultipleSimple(ctx *parser.DeclaracionMultipleSimpleContext) interface{} {
+	if ctx.Tipos() == nil || ctx.ListaIDS() == nil {
+		v.Tabla.Errores.NewSemanticError(ctx.GetStart(), "Declaración incompleta")
+		return nil
+	}
+
+	ids := obtenerIDs(ctx.ListaIDS())
+	tipo := ctx.Tipos().GetText()
+
+	var valorDefault interface{}
+	switch strings.ToLower(tipo) {
+	case "int":
+		valorDefault = 0
+	case "float":
+		valorDefault = 0.0
+	case "string":
+		valorDefault = ""
+	case "bool":
+		valorDefault = false
+	default:
+		v.Tabla.Errores.NewSemanticError(ctx.GetStart(), "Tipo desconocido: "+tipo)
+		return nil
+	}
+
+	// Verificación de cada variable
+	for _, id := range ids {
+		if yaDeclaradoEnAmbitoActual(id, tipo, v.Tabla) {
+			msg := fmt.Sprintf("Error: variable '%s' ya fue declarada con otro tipo en este ámbito", id)
+			v.Tabla.Errores.NewSemanticError(ctx.GetStart(), msg)
+			return nil
+		}
+	}
+
+	valores := make([]interface{}, len(ids))
+	for i := range valores {
+		valores[i] = valorDefault
+	}
+
+	if err := traducciones.ProcesarDeclaracionMultiple(ids, valores, tipo, v.Tabla, &v.OutputASM); err != nil {
+		v.Tabla.Errores.NewSemanticError(ctx.GetStart(), err.Error())
+	}
+
+	return nil
+}
+
+func (v *EvalVisitor) VisitDeclaracionMultipleSinTipo(ctx *parser.DeclaracionMultipleSinTipoContext) interface{} {
+	listaExpr := ctx.ListaExpr()
+	valores := obtenerValores(listaExpr, v)
+	ids := obtenerIDs(ctx.ListaIDS())
+
+	if len(ids) != len(valores) {
+		msg := fmt.Sprintf("Error semántico: cantidad de variables (%d) no coincide con valores (%d)",
+			len(ids), len(valores))
+		v.Tabla.Errores.NewSemanticError(ctx.GetStart(), msg)
+		return nil
+	}
+
+	for i, id := range ids {
+		valor := valores[i]
+		tipo := inferirTipo(valor)
+		if yaDeclaradoEnAmbitoActual(id, tipo, v.Tabla) {
+			msg := fmt.Sprintf("Error: variable '%s' ya fue declarada con otro tipo en este ámbito", id)
+			v.Tabla.Errores.NewSemanticError(ctx.GetStart(), msg)
+			continue
+		}
+		// Guardar variable y tipo en entorno y tabla
+		v.Entorno[id] = valor
+		v.Tabla.DeclararVariable(id, tipo, valor, ctx, v.Tabla.EntornoActual.Nombre)
+
+		err := traducciones.GenerarCodigoDeclaracionSinTipo(id, tipo, valor, &v.OutputASM)
+		if err != nil {
+			v.Tabla.Errores.NewSemanticError(ctx.GetStart(), err.Error())
+		}
+
+		fmt.Printf("Variable declarada: %s tipo: %s con valor: %v\n", id, tipo, valor)
 	}
 
 	return nil
@@ -103,7 +197,6 @@ func (v *EvalVisitor) VisitPrint(ctx *parser.PrintContext) interface{} {
 		val := v.Visit(expr)
 		texto := valorAString(val)
 
-		// Generar ensamblador para ese texto
 		traducciones.GenerarCodigoPrint(texto, false)
 	}
 	return nil
@@ -116,7 +209,6 @@ func (v *EvalVisitor) VisitPrintln(ctx *parser.PrintlnContext) interface{} {
 		val := v.Visit(expr)
 		texto := valorAString(val)
 
-		// Generar ensamblador con salto de línea explícito
 		traducciones.GenerarCodigoPrint(texto, true)
 	}
 	return nil
@@ -303,4 +395,36 @@ func (v *EvalVisitor) OutputASMBuilder() *strings.Builder {
 
 func (v *EvalVisitor) TablaSimbolos() *symbols.TablaSimbolos {
 	return v.Tabla
+}
+func inferirTipo(valor interface{}) string {
+	switch v := valor.(type) {
+	case int:
+		return "int"
+	case float64:
+		return "float"
+	case string:
+		return "string"
+	case bool:
+		return "bool"
+	case []interface{}:
+		if len(v) == 0 {
+			return "slice(unknown)"
+		}
+		return "slice(" + inferirTipo(v[0]) + ")"
+	case [][]interface{}:
+		if len(v) == 0 || len(v[0]) == 0 {
+			return "slice(slice(unknown))"
+		}
+		return "slice(slice(" + inferirTipo(v[0][0]) + "))"
+	default:
+		return fmt.Sprintf("%T", valor)
+	}
+}
+func yaDeclaradoEnAmbitoActual(id string, tipo string, tabla *symbols.TablaSimbolos) bool {
+	simbolo, existe := tabla.EntornoActual.Simbolos[id]
+	if !existe {
+		return false
+	}
+	// Si ya existe y el tipo es distinto, entonces no es válido
+	return simbolo.TipoDato != tipo
 }
