@@ -3,6 +3,7 @@ package backend
 import (
 	parser "VAsm/backend/analizador/parser"
 	"VAsm/backend/visitor"
+
 	"VAsm/frontend/symbols"
 	"fmt"
 

@@ -8,10 +8,9 @@ import (
 )
 
 func main() {
-	var entrada string = "print(\"Hola mundo\")"
 	a := app.New()
 	w := a.NewWindow("Hello")
-	backend.Run(entrada)
+	backend.Run("")
 	frontend.BuildMainWindow(w)
 	w.ShowAndRun()
 }
