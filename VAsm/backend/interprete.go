@@ -1,16 +1,17 @@
 package backend
 
 import (
-	"fmt"
 	parser "VAsm/backend/analizador/parser"
 	"VAsm/backend/visitor"
+	"VAsm/frontend/symbols"
+	"fmt"
+
 	"github.com/antlr4-go/antlr/v4"
 )
 
 type TreeShapeListener struct {
-    *parser.BasegramaticaListener 
+	*parser.BasegramaticaListener
 }
-
 
 func Run(entrada string) {
 	input := antlr.NewInputStream(entrada)
@@ -19,6 +20,8 @@ func Run(entrada string) {
 	p := parser.NewgramaticaParser(stream)
 	tree := p.Init()
 	fmt.Println(tree.ToStringTree(p.RuleNames, p))
-	visitor := visitor.NewEvalVisitor()
+	// Initialize the symbol table as needed; here we use an empty TablaSimbolos as an example
+	simbolTable := symbols.NewTablaSimbolos()
+	visitor := visitor.NewEvalVisitor(simbolTable)
 	visitor.Visit(tree)
 }
