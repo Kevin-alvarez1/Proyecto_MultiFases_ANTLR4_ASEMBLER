@@ -19,7 +19,7 @@ type EvalVisitor struct {
 func NewEvalVisitor(tabla *symbols.TablaSimbolos) *EvalVisitor {
 	return &EvalVisitor{
 		BasegramaticaVisitor: &parser.BasegramaticaVisitor{},
-				Console:              &strings.Builder{},
+		Console:              &strings.Builder{},
 	}
 }
 
@@ -64,9 +64,58 @@ func (v *EvalVisitor) VisitInstruccion(ctx *parser.InstruccionContext) interface
 
 // gramatica para imprimir
 func (v *EvalVisitor) VisitPrint(ctx *parser.PrintContext) interface{} {
+	var output strings.Builder
 	expresiones := ctx.ListaExpr().AllExpresion()
-	fmt.Println(expresiones)
-	return nil
+
+	for i, expr := range expresiones {
+		val := v.Visit(expr)
+		fmt.Printf("[DEBUG PRINT] Argumento %d: Valor %#v (Tipo: %T)\n", i, val, val)
+		output.WriteString(valorAString(val))
+		if i < len(expresiones)-1 {
+			output.WriteString(" ")
+		}
+	}
+
+	v.Console.WriteString(output.String())
+	return output.String()
+}
+func valorAString(val interface{}) string {
+	switch v := val.(type) {
+	case nil:
+		return "<nil>"
+	case string:
+		return v
+	case int, float64, bool:
+		return fmt.Sprintf("%v", v)
+	case []interface{}:
+		var partes []string
+		for _, elem := range v {
+			partes = append(partes, valorAString(elem))
+		}
+		return "[" + strings.Join(partes, ", ") + "]"
+	case [][]interface{}:
+		var filas []string
+		for _, fila := range v {
+			if fila == nil {
+				filas = append(filas, "<nil>")
+				continue
+			}
+			var sub []string
+			for _, elem := range fila {
+				sub = append(sub, valorAString(elem))
+			}
+			filas = append(filas, "["+strings.Join(sub, ", ")+"]")
+		}
+		return "[" + strings.Join(filas, ", ") + "]"
+	case map[string]interface{}:
+		var campos []string
+		for k, valCampo := range v {
+			campos = append(campos, fmt.Sprintf("%s: %s", k, valorAString(valCampo)))
+		}
+		return "{" + strings.Join(campos, ", ") + "}"
+	default:
+		return fmt.Sprintf("<valor desconocido: %v (%T)>", v, v)
+	}
 }
 
 // gramatica para las expresiones
