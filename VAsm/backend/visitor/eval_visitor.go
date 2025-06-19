@@ -2,19 +2,24 @@ package visitor
 
 import (
 	parser "VAsm/backend/analizador/parser"
+	"VAsm/frontend/symbols"
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
+
 	"github.com/antlr4-go/antlr/v4"
 )
 
 type EvalVisitor struct {
 	*parser.BasegramaticaVisitor
+	Console *strings.Builder
 }
 
-func NewEvalVisitor() *EvalVisitor {
+func NewEvalVisitor(tabla *symbols.TablaSimbolos) *EvalVisitor {
 	return &EvalVisitor{
 		BasegramaticaVisitor: &parser.BasegramaticaVisitor{},
+				Console:              &strings.Builder{},
 	}
 }
 
@@ -40,6 +45,7 @@ func (v *EvalVisitor) VisitInit(ctx *parser.InitContext) interface{} {
 
 	return resultados
 }
+
 // visitar instrucciones
 func (v *EvalVisitor) VisitInstrucciones(ctx *parser.InstruccionesContext) interface{} {
 	for _, inst := range ctx.AllInstruccion() {
@@ -63,20 +69,23 @@ func (v *EvalVisitor) VisitPrint(ctx *parser.PrintContext) interface{} {
 	return nil
 }
 
-
 // gramatica para las expresiones
 func (v *EvalVisitor) VisitExpresion(ctx *parser.ExpresionContext) interface{} {
-		/* EXPRESIONES NATIVAS */
+	/* EXPRESIONES NATIVAS */
 	if ctx.CADENA() != nil {
 		text := ctx.CADENA().GetText()
 		return text[1 : len(text)-1]
 	}
 
 	// booleano true
-	if ctx.TRUE() != nil {return true }
-	
+	if ctx.TRUE() != nil {
+		return true
+	}
+
 	// booleano false
-	if ctx.FALSE() != nil { return false }
+	if ctx.FALSE() != nil {
+		return false
+	}
 
 	if ctx.ENTERO() != nil {
 		val, err := strconv.Atoi(ctx.ENTERO().GetText())
