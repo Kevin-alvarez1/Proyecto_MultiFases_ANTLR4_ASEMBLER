@@ -34,8 +34,8 @@ type gramaticaVisitor interface {
 	// Visit a parse tree produced by gramaticaParser#asignacionMultiple.
 	VisitAsignacionMultiple(ctx *AsignacionMultipleContext) interface{}
 
-	// Visit a parse tree produced by gramaticaParser#bloqueFuncion.
-	VisitBloqueFuncion(ctx *BloqueFuncionContext) interface{}
+	// Visit a parse tree produced by gramaticaParser#bloque.
+	VisitBloque(ctx *BloqueContext) interface{}
 
 	// Visit a parse tree produced by gramaticaParser#llamadaFuncionesSinParametro.
 	VisitLlamadaFuncionesSinParametro(ctx *LlamadaFuncionesSinParametroContext) interface{}
@@ -129,9 +129,6 @@ type gramaticaVisitor interface {
 
 	// Visit a parse tree produced by gramaticaParser#elseifPart.
 	VisitElseifPart(ctx *ElseifPartContext) interface{}
-
-	// Visit a parse tree produced by gramaticaParser#bloque.
-	VisitBloque(ctx *BloqueContext) interface{}
 
 	// Visit a parse tree produced by gramaticaParser#ForCondicional.
 	VisitForCondicional(ctx *ForCondicionalContext) interface{}

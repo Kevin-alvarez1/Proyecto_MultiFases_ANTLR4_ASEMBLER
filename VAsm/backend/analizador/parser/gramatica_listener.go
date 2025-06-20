@@ -34,8 +34,8 @@ type gramaticaListener interface {
 	// EnterAsignacionMultiple is called when entering the asignacionMultiple production.
 	EnterAsignacionMultiple(c *AsignacionMultipleContext)
 
-	// EnterBloqueFuncion is called when entering the bloqueFuncion production.
-	EnterBloqueFuncion(c *BloqueFuncionContext)
+	// EnterBloque is called when entering the bloque production.
+	EnterBloque(c *BloqueContext)
 
 	// EnterLlamadaFuncionesSinParametro is called when entering the llamadaFuncionesSinParametro production.
 	EnterLlamadaFuncionesSinParametro(c *LlamadaFuncionesSinParametroContext)
@@ -130,9 +130,6 @@ type gramaticaListener interface {
 	// EnterElseifPart is called when entering the elseifPart production.
 	EnterElseifPart(c *ElseifPartContext)
 
-	// EnterBloque is called when entering the bloque production.
-	EnterBloque(c *BloqueContext)
-
 	// EnterForCondicional is called when entering the ForCondicional production.
 	EnterForCondicional(c *ForCondicionalContext)
 
@@ -187,8 +184,8 @@ type gramaticaListener interface {
 	// ExitAsignacionMultiple is called when exiting the asignacionMultiple production.
 	ExitAsignacionMultiple(c *AsignacionMultipleContext)
 
-	// ExitBloqueFuncion is called when exiting the bloqueFuncion production.
-	ExitBloqueFuncion(c *BloqueFuncionContext)
+	// ExitBloque is called when exiting the bloque production.
+	ExitBloque(c *BloqueContext)
 
 	// ExitLlamadaFuncionesSinParametro is called when exiting the llamadaFuncionesSinParametro production.
 	ExitLlamadaFuncionesSinParametro(c *LlamadaFuncionesSinParametroContext)
@@ -282,9 +279,6 @@ type gramaticaListener interface {
 
 	// ExitElseifPart is called when exiting the elseifPart production.
 	ExitElseifPart(c *ElseifPartContext)
-
-	// ExitBloque is called when exiting the bloque production.
-	ExitBloque(c *BloqueContext)
 
 	// ExitForCondicional is called when exiting the ForCondicional production.
 	ExitForCondicional(c *ForCondicionalContext)

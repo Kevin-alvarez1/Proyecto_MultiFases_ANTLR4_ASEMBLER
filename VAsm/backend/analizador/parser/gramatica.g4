@@ -28,6 +28,7 @@ instruccion
     | sliceDef    
     | declaracionSliceVacio
     | modificacionElementoSlice
+    | bloque
 ;
 
 print: PRINT PAR1 listaExpr PAR2;
@@ -51,8 +52,8 @@ asignacionMultiple
 
 // funciones
 
-bloqueFuncion
-    : (instruccion | expresion)*
+bloque
+    : LLAV1 (instruccion | expresion)* LLAV2
     ;
 
 llamadaFuncionesSinParametro
@@ -64,11 +65,11 @@ llamadaFuncionesConParametro
     ;
 
 fnSinParametro
-    : FUNCIONES IDENTIFICADOR '('')' tipoRetorno? '{' bloqueFuncion '}'
+    : FUNCIONES IDENTIFICADOR '('')' tipoRetorno? bloque
     ;
 
 fnConParametro
-    : FUNCIONES IDENTIFICADOR '(' listaPar ')' tipoRetorno? '{' bloqueFuncion'}'
+    : FUNCIONES IDENTIFICADOR '(' listaPar ')' tipoRetorno? bloque
     ;
 
 // slices
@@ -215,9 +216,7 @@ elseifPart
     : ELSE IF (PAR1 expresion PAR2 | expresion ) bloque
 ;
 
-bloque
-    : LLAV1 instrucciones* LLAV2
-;
+
 
 /*  FOor Condicional, Clasico y Range */
 sfor

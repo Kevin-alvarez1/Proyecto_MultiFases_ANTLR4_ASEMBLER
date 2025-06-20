@@ -78,11 +78,11 @@ func (s *BasegramaticaListener) EnterAsignacionMultiple(ctx *AsignacionMultipleC
 // ExitAsignacionMultiple is called when production asignacionMultiple is exited.
 func (s *BasegramaticaListener) ExitAsignacionMultiple(ctx *AsignacionMultipleContext) {}
 
-// EnterBloqueFuncion is called when production bloqueFuncion is entered.
-func (s *BasegramaticaListener) EnterBloqueFuncion(ctx *BloqueFuncionContext) {}
+// EnterBloque is called when production bloque is entered.
+func (s *BasegramaticaListener) EnterBloque(ctx *BloqueContext) {}
 
-// ExitBloqueFuncion is called when production bloqueFuncion is exited.
-func (s *BasegramaticaListener) ExitBloqueFuncion(ctx *BloqueFuncionContext) {}
+// ExitBloque is called when production bloque is exited.
+func (s *BasegramaticaListener) ExitBloque(ctx *BloqueContext) {}
 
 // EnterLlamadaFuncionesSinParametro is called when production llamadaFuncionesSinParametro is entered.
 func (s *BasegramaticaListener) EnterLlamadaFuncionesSinParametro(ctx *LlamadaFuncionesSinParametroContext) {
@@ -275,12 +275,6 @@ func (s *BasegramaticaListener) EnterElseifPart(ctx *ElseifPartContext) {}
 
 // ExitElseifPart is called when production elseifPart is exited.
 func (s *BasegramaticaListener) ExitElseifPart(ctx *ElseifPartContext) {}
-
-// EnterBloque is called when production bloque is entered.
-func (s *BasegramaticaListener) EnterBloque(ctx *BloqueContext) {}
-
-// ExitBloque is called when production bloque is exited.
-func (s *BasegramaticaListener) ExitBloque(ctx *BloqueContext) {}
 
 // EnterForCondicional is called when production ForCondicional is entered.
 func (s *BasegramaticaListener) EnterForCondicional(ctx *ForCondicionalContext) {}
