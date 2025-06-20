@@ -330,6 +330,65 @@ mov x0, #%d
 	return intVal
 }
 
+func (v *EvalVisitor) VisitFnParseToFloat(ctx *parser.FnParseToFloatContext) interface{} {
+	if ctx.ListaExpr() == nil {
+		v.Tabla.Errores.NewSemanticError(ctx.GetStart(), "ParseFloat requiere un argumento")
+		return nil
+	}
+
+	expresiones := ctx.ListaExpr().AllExpresion()
+	if len(expresiones) != 1 {
+		v.Tabla.Errores.NewSemanticError(ctx.GetStart(), "ParseFloat requiere exactamente un argumento")
+		return nil
+	}
+
+	val := v.Visit(expresiones[0])
+	strVal, ok := val.(string)
+	if !ok {
+		v.Tabla.Errores.NewSemanticError(ctx.GetStart(), fmt.Sprintf("ParseFloat espera un string, pero recibió: %T", val))
+		return nil
+	}
+
+	if matched, _ := regexp.MatchString(`^-?\d+(\.\d+)?$`, strVal); !matched {
+		v.Tabla.Errores.NewSemanticError(ctx.GetStart(), fmt.Sprintf("ParseFloat: '%s' no es un número flotante válido", strVal))
+		return nil
+	}
+
+	floatVal, err := strconv.ParseFloat(strVal, 64)
+	if err != nil {
+		v.Tabla.Errores.NewSemanticError(ctx.GetStart(), fmt.Sprintf("ParseFloat: error al convertir '%s' a float", strVal))
+		return nil
+	}
+
+	traducciones.GenerarCodigoParseFloat(strVal, floatVal, &v.OutputASM)
+
+	return floatVal
+}
+
+func (v *EvalVisitor) VisitFnTypeOf(ctx *parser.FnTypeOfContext) interface{} {
+	if ctx.ListaExpr() == nil {
+		v.Tabla.Errores.NewSemanticError(ctx.GetStart(), "TypeOf requiere un argumento")
+		return "undefined"
+	}
+
+	expresiones := ctx.ListaExpr().AllExpresion()
+	if len(expresiones) != 1 {
+		v.Tabla.Errores.NewSemanticError(ctx.GetStart(), "TypeOf requiere exactamente un argumento")
+		return "undefined"
+	}
+
+	val := v.Visit(expresiones[0])
+	if val == nil {
+		return "nil"
+	}
+
+	tipo := inferirTipo(val)
+
+	traducciones.GenerarCodigoTypeOf(tipo)
+
+	return tipo
+}
+
 // ========= GENERADOR DE ASM =========
 
 func (v *EvalVisitor) GenerarASMFinal() string {
