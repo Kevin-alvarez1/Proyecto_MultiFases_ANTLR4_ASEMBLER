@@ -53,6 +53,7 @@ func (v *EvalVisitor) VisitInit(ctx *parser.InitContext) interface{} {
 		}
 	}
 	v.GenerarASMFinal()
+	contadorBloques = 0
 	return resultados
 }
 
