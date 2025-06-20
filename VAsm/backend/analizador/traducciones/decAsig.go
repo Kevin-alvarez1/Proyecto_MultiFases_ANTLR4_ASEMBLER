@@ -9,6 +9,7 @@ import (
 
 var contadorFloat int
 var contadorString int
+var variablesReservadas = make(map[string]bool)
 
 // ProcesarDeclaracionMultiple recibe el visitor como parámetro
 func ProcesarDeclaracionMultiple(
@@ -29,6 +30,7 @@ func ProcesarDeclaracionMultiple(
 		}
 
 		generarCodigoDeclaracion(id, tipo, valor, outputASM)
+		reservarVariableEnData(id, tipo)
 
 		simbolo := &symbols.Simbolo{
 			ID:          id,
@@ -43,6 +45,8 @@ func ProcesarDeclaracionMultiple(
 }
 
 func generarCodigoDeclaracion(id, tipo string, valor interface{}, outputASM *strings.Builder) {
+	reservarVariableEnData(id, tipo)
+
 	switch val := valor.(type) {
 	case int:
 		generarCodigoInt(id, val, outputASM)
@@ -74,6 +78,8 @@ func generarCodigoDeclaracion(id, tipo string, valor interface{}, outputASM *str
 }
 
 func GenerarCodigoDeclaracionSinTipo(id, tipo string, valor interface{}, outputASM *strings.Builder) error {
+	reservarVariableEnData(id, tipo)
+
 	switch tipo {
 	case "int":
 		val, ok := valor.(int)
@@ -160,18 +166,28 @@ func extraerTipoInterno(tipo string) string {
 }
 
 func generarCodigoInt(id string, valor int, outputASM *strings.Builder) {
-	// Comentario y código ASM que mueve el valor al registro x0 (puedes adaptar si quieres más lógica)
-	codigo := fmt.Sprintf("mov x0, #%d\n\n", valor)
-	outputASM.WriteString(codigo)
+	// Primero movemos el valor inmediato a un registro, por ejemplo x10
+	outputASM.WriteString(fmt.Sprintf("mov x10, #%d\n", valor))
+	// Luego obtenemos la dirección de la variable con adr (la variable debe tener una etiqueta igual a 'id')
+	outputASM.WriteString(fmt.Sprintf("adr x11, %s\n", id))
+	// Finalmente almacenamos el valor de x10 en la dirección apuntada por x11
+	outputASM.WriteString("str x10, [x11]\n\n")
 }
 
 func generarCodigoFloat(id string, val float64, outputASM *strings.Builder) {
 	etiqueta := fmt.Sprintf("float_val_%s_%d", id, contadorFloat)
 	contadorFloat++
 
+	// Reservar espacio en .data para el float con su valor
 	dataBuilder.WriteString(fmt.Sprintf("%s: .float %f\n", etiqueta, val))
-	textBuilder.WriteString(fmt.Sprintf("ldr s0, =%s\n", etiqueta))
+
+	// Aquí cargamos la dirección del float y almacenamos su valor en la variable
+	// Se asume que la variable está reservada en .data con etiqueta 'id'
+	outputASM.WriteString(fmt.Sprintf("ldr s0, =%s\n", etiqueta)) // Cargar valor float en s0
+	outputASM.WriteString(fmt.Sprintf("adr x11, %s\n", id))       // Dirección de variable
+	outputASM.WriteString("str s0, [x11]\n\n")                    // Guardar float en variable
 }
+
 func generarCodigoString(id string, valor string, outputASM *strings.Builder) string {
 	etiqueta := fmt.Sprintf("String_val_%s_%d", id, contadorString)
 	contadorString++
@@ -179,6 +195,12 @@ func generarCodigoString(id string, valor string, outputASM *strings.Builder) st
 
 	// Cadena única en .data
 	dataBuilder.WriteString(fmt.Sprintf("%s: .ascii \"%s\"\n", etiqueta, escaped))
+
+	// Aquí puedes almacenar la dirección de la cadena en la variable
+	outputASM.WriteString(fmt.Sprintf("adr x10, %s\n", etiqueta)) // Dirección de la cadena
+	outputASM.WriteString(fmt.Sprintf("adr x11, %s\n", id))       // Dirección variable
+	outputASM.WriteString("str x10, [x11]\n\n")                   // Guardar dirección en variable (puntero)
+
 	return etiqueta
 }
 
@@ -187,6 +209,23 @@ func generarCodigoBool(id string, val bool, outputASM *strings.Builder) {
 	if val {
 		bit = 1
 	}
-	codigo := fmt.Sprintf("mov x0, #%d\n\n", bit)
-	outputASM.WriteString(codigo)
+	outputASM.WriteString(fmt.Sprintf("mov x10, #%d\n", bit))
+	outputASM.WriteString(fmt.Sprintf("adr x11, %s\n", id))
+	outputASM.WriteString("str x10, [x11]\n\n")
+}
+func reservarVariableEnData(id string, tipo string) {
+	if variablesReservadas[id] {
+		return
+	}
+	switch tipo {
+	case "int", "bool":
+		dataBuilder.WriteString(fmt.Sprintf("%s: .quad 0\n", id))
+	case "float":
+		dataBuilder.WriteString(fmt.Sprintf("%s: .float 0.0\n", id))
+	case "string":
+		dataBuilder.WriteString(fmt.Sprintf("%s: .quad 0\n", id)) // puntero o vacío
+	default:
+		dataBuilder.WriteString(fmt.Sprintf("%s: .quad 0\n", id))
+	}
+	variablesReservadas[id] = true
 }
