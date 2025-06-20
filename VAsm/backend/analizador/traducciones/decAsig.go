@@ -8,6 +8,7 @@ import (
 )
 
 var contadorFloat int
+var contadorString int
 
 // ProcesarDeclaracionMultiple recibe el visitor como parámetro
 func ProcesarDeclaracionMultiple(
@@ -171,12 +172,14 @@ func generarCodigoFloat(id string, val float64, outputASM *strings.Builder) {
 	dataBuilder.WriteString(fmt.Sprintf("%s: .float %f\n", etiqueta, val))
 	textBuilder.WriteString(fmt.Sprintf("ldr s0, =%s\n", etiqueta))
 }
-func generarCodigoString(id string, valor string, outputASM *strings.Builder) {
-	etiqueta := id
+func generarCodigoString(id string, valor string, outputASM *strings.Builder) string {
+	etiqueta := fmt.Sprintf("String_val_%s_%d", id, contadorString)
+	contadorString++
 	escaped := escape(valor)
 
-	// Solo en .data
+	// Cadena única en .data
 	dataBuilder.WriteString(fmt.Sprintf("%s: .ascii \"%s\"\n", etiqueta, escaped))
+	return etiqueta
 }
 
 func generarCodigoBool(id string, val bool, outputASM *strings.Builder) {
