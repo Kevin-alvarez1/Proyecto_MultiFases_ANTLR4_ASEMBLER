@@ -32,6 +32,7 @@ type Entorno struct {
 	Padre    *Entorno
 	Hijos    []*Entorno
 	Simbolos map[string]*Simbolo
+	Anterior *Entorno
 }
 
 // Simbolo representa un elemento en la tabla de símbolos
@@ -253,4 +254,18 @@ func (ts *TablaSimbolos) ToString() string {
 	}
 
 	return sb.String()
+}
+
+func (ts *TablaSimbolos) Imprimir() {
+	var recorrer func(e *Entorno, nivel int)
+	recorrer = func(e *Entorno, nivel int) {
+		fmt.Printf("%sEntorno: %s\n", strings.Repeat("  ", nivel), e.Nombre)
+		for id, sim := range e.Simbolos {
+			fmt.Printf("%s  %s (%s) = %v\n", strings.Repeat("  ", nivel), id, sim.TipoDato, sim.Valor)
+		}
+		for _, hijo := range e.Hijos {
+			recorrer(hijo, nivel+1)
+		}
+	}
+	recorrer(ts.EntornoGlobal, 0)
 }

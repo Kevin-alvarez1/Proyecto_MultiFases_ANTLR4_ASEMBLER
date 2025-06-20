@@ -13,6 +13,8 @@ import (
 	"github.com/antlr4-go/antlr/v4"
 )
 
+var contadorBloques int = 0
+
 type EvalVisitor struct {
 	*parser.BasegramaticaVisitor
 	Entorno   map[string]interface{}
@@ -79,10 +81,16 @@ func (v *EvalVisitor) VisitInstruccion(ctx *parser.InstruccionContext) interface
 	if ctx.DeclaracionMultipleSinTipo() != nil {
 		return v.Visit(ctx.DeclaracionMultipleSinTipo())
 	}
+	if ctx.AsignacionMultiple() != nil {
+		return v.Visit(ctx.AsignacionMultiple())
+	}
+	if ctx.Bloque() != nil {
+		return v.Visit(ctx.Bloque())
+	}
 	return nil
 }
 
-// gramatica para asignaciones y declaraciones
+// ========= DECLARACIONES =========
 func (v *EvalVisitor) VisitDeclaracionMultiple(ctx *parser.DeclaracionMultipleContext) interface{} {
 	tipo := ctx.Tipos().GetText()
 	valores := obtenerValores(ctx.ListaExpr(), v)
@@ -189,6 +197,74 @@ func (v *EvalVisitor) VisitDeclaracionMultipleSinTipo(ctx *parser.DeclaracionMul
 	return nil
 }
 
+// ========= ASIGNACIONES =========
+func (v *EvalVisitor) VisitAsignacionMultiple(ctx *parser.AsignacionMultipleContext) interface{} {
+	ids := obtenerIDs(ctx.ListaIDS())
+	valores := obtenerValores(ctx.ListaExpr(), v)
+
+	if len(ids) != len(valores) {
+		v.Tabla.Errores.NewSemanticError(ctx.GetStart(), "Número de variables y valores no coincide en asignación múltiple")
+		return nil
+	}
+
+	for i, id := range ids {
+		valor := valores[i]
+		valorInferido := inferirTipo(valor)
+
+		simbolo := v.Tabla.EntornoActual.BuscarSimbolo(id)
+		if simbolo == nil {
+			msg := fmt.Sprintf("Error: variable '%s' no ha sido declarada en este ámbito", id)
+			v.Tabla.Errores.NewSemanticError(ctx.GetStart(), msg)
+			continue
+		}
+
+		if !tiposCompatibles(simbolo.TipoDato, valorInferido) {
+			msg := fmt.Sprintf("Error: tipo incompatible en asignación. '%s' es de tipo '%s', no '%s'",
+				id, simbolo.TipoDato, valorInferido)
+			v.Tabla.Errores.NewSemanticError(ctx.GetStart(), msg)
+			continue
+		}
+
+		// Actualización
+		simbolo.Valor = valor
+		v.Entorno[id] = valor
+		fmt.Printf("Asignación: %s = %v (tipo: %s)\n", id, valor, valorInferido)
+
+		// Generar ASM (opcional)
+		err := traducciones.GenerarCodigoDeclaracionSinTipo(id, simbolo.TipoDato, valor, &v.OutputASM)
+		if err != nil {
+			v.Tabla.Errores.NewSemanticError(ctx.GetStart(), err.Error())
+		}
+	}
+
+	return nil
+}
+
+// ========= FUNCIONES =========
+func (v *EvalVisitor) VisitBloque(ctx *parser.BloqueContext) interface{} {
+	// Crear un nuevo entorno hijo
+	nuevo := symbols.NewEntorno(v.Tabla.EntornoActual, generarNombreUnico("bloque", v.Tabla.EntornoActual.Nombre))
+
+	v.Tabla.EntornoActual.Hijos = append(v.Tabla.EntornoActual.Hijos, nuevo)
+
+	entornoAnterior := v.Tabla.EntornoActual
+	v.Tabla.EntornoActual = nuevo
+
+	// Visitar todas las instrucciones y expresiones dentro del bloque
+	for _, instr := range ctx.AllInstruccion() {
+		v.Visit(instr)
+	}
+	for _, expr := range ctx.AllExpresion() {
+		v.Visit(expr)
+	}
+
+	// Restaurar entorno anterior
+	v.Tabla.EntornoActual = entornoAnterior
+
+	return nil
+}
+
+// ========= FUNCIONES EMBEBIDAS =========
 // gramatica para imprimir
 func (v *EvalVisitor) VisitPrint(ctx *parser.PrintContext) interface{} {
 	expresiones := ctx.ListaExpr().AllExpresion()
@@ -245,7 +321,6 @@ func (v *EvalVisitor) VisitFnAtoi(ctx *parser.FnAtoiContext) interface{} {
 		return nil
 	}
 
-	// ✅ Generar código ensamblador directamente
 	asm := fmt.Sprintf(`// Atoi("%s") → %d
 mov x0, #%d
 
@@ -254,6 +329,8 @@ mov x0, #%d
 
 	return intVal
 }
+
+// ========= GENERADOR DE ASM =========
 
 func (v *EvalVisitor) GenerarASMFinal() string {
 	asm := traducciones.EmitirCodigoCompleto()
@@ -266,7 +343,7 @@ func (v *EvalVisitor) GenerarASMFinal() string {
 	return asm
 }
 
-// gramatica para las expresiones
+// ========= EXPRESIONES =========
 func (v *EvalVisitor) VisitExpresion(ctx *parser.ExpresionContext) interface{} {
 	/* EXPRESIONES NATIVAS */
 	if ctx.IDENTIFICADOR() != nil {
@@ -327,6 +404,8 @@ func (v *EvalVisitor) VisitExpresion(ctx *parser.ExpresionContext) interface{} {
 
 	return 0
 }
+
+// ========= FUNCIONES AUXILIARES =========
 
 func obtenerValores(ctx parser.IListaExprContext, visitor *EvalVisitor) []interface{} {
 	valores := []interface{}{}
@@ -427,4 +506,21 @@ func yaDeclaradoEnAmbitoActual(id string, tipo string, tabla *symbols.TablaSimbo
 	}
 	// Si ya existe y el tipo es distinto, entonces no es válido
 	return simbolo.TipoDato != tipo
+}
+
+func tiposCompatibles(tipoVar string, tipoValor string) bool {
+	if tipoVar == tipoValor {
+		return true
+	}
+	// Permitir asignar int a float
+	if tipoVar == "float64" && tipoValor == "int" {
+		return true
+	}
+
+	return false
+}
+
+func generarNombreUnico(base string, padre string) string {
+	contadorBloques++
+	return fmt.Sprintf("%s_%s_%d", base, padre, contadorBloques)
 }

@@ -43,7 +43,7 @@ func (v *BasegramaticaVisitor) VisitAsignacionMultiple(ctx *AsignacionMultipleCo
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasegramaticaVisitor) VisitBloqueFuncion(ctx *BloqueFuncionContext) interface{} {
+func (v *BasegramaticaVisitor) VisitBloque(ctx *BloqueContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -168,10 +168,6 @@ func (v *BasegramaticaVisitor) VisitSif(ctx *SifContext) interface{} {
 }
 
 func (v *BasegramaticaVisitor) VisitElseifPart(ctx *ElseifPartContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BasegramaticaVisitor) VisitBloque(ctx *BloqueContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

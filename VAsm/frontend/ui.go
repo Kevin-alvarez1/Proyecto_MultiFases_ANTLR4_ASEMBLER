@@ -253,6 +253,7 @@ func BuildMainWindow(win fyne.Window) *Editor {
 			result := editor.Visitor.Visit(tree)
 			output := editor.Visitor.Console.String()
 			output = strings.TrimSpace(output)
+
 			tmpSVG, err := os.CreateTemp("", "cst_*.svg")
 			if err != nil {
 				log.Println("Error creando archivo temporal SVG:", err)
