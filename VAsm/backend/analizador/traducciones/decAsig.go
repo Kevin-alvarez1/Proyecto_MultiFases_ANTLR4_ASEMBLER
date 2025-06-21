@@ -164,43 +164,29 @@ func extraerTipoInterno(tipo string) string {
 	}
 	return tipo
 }
-
 func generarCodigoInt(id string, valor int, outputASM *strings.Builder) {
-	// Primero movemos el valor inmediato a un registro, por ejemplo x10
 	outputASM.WriteString(fmt.Sprintf("mov x10, #%d\n", valor))
-	// Luego obtenemos la dirección de la variable con adr (la variable debe tener una etiqueta igual a 'id')
 	outputASM.WriteString(fmt.Sprintf("adr x11, %s\n", id))
-	// Finalmente almacenamos el valor de x10 en la dirección apuntada por x11
 	outputASM.WriteString("str x10, [x11]\n\n")
 }
 
 func generarCodigoFloat(id string, val float64, outputASM *strings.Builder) {
 	etiqueta := fmt.Sprintf("float_val_%s_%d", id, contadorFloat)
 	contadorFloat++
-
-	// Reservar espacio en .data para el float con su valor
-	dataBuilder.WriteString(fmt.Sprintf("%s: .float %f\n", etiqueta, val))
-
-	// Aquí cargamos la dirección del float y almacenamos su valor en la variable
-	// Se asume que la variable está reservada en .data con etiqueta 'id'
-	outputASM.WriteString(fmt.Sprintf("ldr s0, =%s\n", etiqueta)) // Cargar valor float en s0
-	outputASM.WriteString(fmt.Sprintf("adr x11, %s\n", id))       // Dirección de variable
-	outputASM.WriteString("str s0, [x11]\n\n")                    // Guardar float en variable
+	DataBuilder.WriteString(fmt.Sprintf("%s: .float %f\n", etiqueta, val))
+	outputASM.WriteString(fmt.Sprintf("ldr s0, =%s\n", etiqueta))
+	outputASM.WriteString(fmt.Sprintf("adr x11, %s\n", id))
+	outputASM.WriteString("str s0, [x11]\n\n")
 }
 
 func generarCodigoString(id string, valor string, outputASM *strings.Builder) string {
 	etiqueta := fmt.Sprintf("String_val_%s_%d", id, contadorString)
 	contadorString++
 	escaped := escape(valor)
-
-	// Cadena única en .data
-	dataBuilder.WriteString(fmt.Sprintf("%s: .ascii \"%s\"\n", etiqueta, escaped))
-
-	// Aquí puedes almacenar la dirección de la cadena en la variable
-	outputASM.WriteString(fmt.Sprintf("adr x10, %s\n", etiqueta)) // Dirección de la cadena
-	outputASM.WriteString(fmt.Sprintf("adr x11, %s\n", id))       // Dirección variable
-	outputASM.WriteString("str x10, [x11]\n\n")                   // Guardar dirección en variable (puntero)
-
+	DataBuilder.WriteString(fmt.Sprintf("%s: .ascii \"%s\"\n", etiqueta, escaped))
+	outputASM.WriteString(fmt.Sprintf("adr x10, %s\n", etiqueta))
+	outputASM.WriteString(fmt.Sprintf("adr x11, %s\n", id))
+	outputASM.WriteString("str x10, [x11]\n\n")
 	return etiqueta
 }
 
@@ -219,13 +205,13 @@ func reservarVariableEnData(id string, tipo string) {
 	}
 	switch tipo {
 	case "int", "bool":
-		dataBuilder.WriteString(fmt.Sprintf("%s: .quad 0\n", id))
+		DataBuilder.WriteString(fmt.Sprintf("%s: .quad 0\n", id))
 	case "float":
-		dataBuilder.WriteString(fmt.Sprintf("%s: .float 0.0\n", id))
+		DataBuilder.WriteString(fmt.Sprintf("%s: .float 0.0\n", id))
 	case "string":
-		dataBuilder.WriteString(fmt.Sprintf("%s: .quad 0\n", id)) // puntero o vacío
+		DataBuilder.WriteString(fmt.Sprintf("%s: .quad 0\n", id)) // puntero o vacío
 	default:
-		dataBuilder.WriteString(fmt.Sprintf("%s: .quad 0\n", id))
+		DataBuilder.WriteString(fmt.Sprintf("%s: .quad 0\n", id))
 	}
 	variablesReservadas[id] = true
 }

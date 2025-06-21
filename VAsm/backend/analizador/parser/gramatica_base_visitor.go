@@ -43,6 +43,10 @@ func (v *BasegramaticaVisitor) VisitAsignacionMultiple(ctx *AsignacionMultipleCo
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasegramaticaVisitor) VisitBloqueFuncion(ctx *BloqueFuncionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasegramaticaVisitor) VisitBloque(ctx *BloqueContext) interface{} {
 	return v.VisitChildren(ctx)
 }

@@ -28,7 +28,7 @@ instruccion
     | sliceDef    
     | declaracionSliceVacio
     | modificacionElementoSlice
-    | bloque
+    | bloqueFuncion
 ;
 
 print: PRINT PAR1 listaExpr PAR2;
@@ -51,7 +51,9 @@ asignacionMultiple
     ;
 
 // funciones
-
+bloqueFuncion
+    : LLAV1 (instruccion | expresion)* LLAV2
+    ;
 bloque
     : LLAV1 (instruccion | expresion)* LLAV2
     ;
@@ -65,11 +67,11 @@ llamadaFuncionesConParametro
     ;
 
 fnSinParametro
-    : FUNCIONES IDENTIFICADOR '('')' tipoRetorno? bloque
+    : FUNCIONES IDENTIFICADOR '('')' tipoRetorno? bloqueFuncion
     ;
 
 fnConParametro
-    : FUNCIONES IDENTIFICADOR '(' listaPar ')' tipoRetorno? bloque
+    : FUNCIONES IDENTIFICADOR '(' listaPar ')' tipoRetorno? bloqueFuncion
     ;
 
 // slices
