@@ -73,15 +73,15 @@ func (v *EvalVisitor) Visit(tree antlr.ParseTree) interface{} {
 
 // inicio de la gramatica
 func (v *EvalVisitor) VisitInit(ctx *parser.InitContext) interface{} {
-	traducciones.ResetearCodigoASM() // Limpia TextBuilder, FuncionesBuilder, DataBuilder
+	traducciones.ResetearCodigoASM()
 	v.Funciones = make(map[string][]Funcion)
 	contadorBloques = 0
 	var resultados []interface{}
 	for _, instr := range ctx.AllInstrucciones() {
 		if esFuncion(instr) {
-			v.Visit(instr) // Se genera código en FuncionesBuilder
+			v.Visit(instr)
 		} else {
-			res := v.Visit(instr) // Se genera ASM en TextBuilder
+			res := v.Visit(instr)
 			if res != nil {
 				resultados = append(resultados, res)
 			}
@@ -133,8 +133,14 @@ func (v *EvalVisitor) VisitInstruccion(ctx *parser.InstruccionContext) interface
 	if ctx.FnSinParametro() != nil {
 		return v.Visit(ctx.FnSinParametro())
 	}
+	if ctx.FnConParametro() != nil {
+		return v.Visit(ctx.FnConParametro())
+	}
 	if ctx.LlamadaFuncionesSinParametro() != nil {
 		return v.Visit(ctx.LlamadaFuncionesSinParametro())
+	}
+	if ctx.LlamadaFuncionesConParametro() != nil {
+		return v.Visit(ctx.LlamadaFuncionesConParametro())
 	}
 	if ctx.Retorno() != nil {
 		res := v.Visit(ctx.Retorno())
@@ -374,28 +380,134 @@ func (v *EvalVisitor) VisitLlamadaFuncionesSinParametro(ctx *parser.LlamadaFunci
 	return nil
 }
 
-func (v *EvalVisitor) VisitBloqueFuncion(ctx *parser.BloqueFuncionContext) interface{} {
-	// Guardar contexto actual
+func (v *EvalVisitor) VisitFnConParametro(ctx *parser.FnConParametroContext) interface{} {
+	nombre := ctx.IDENTIFICADOR().GetText()
+	fmt.Printf("[VisitFnConParametro] Definiendo función '%s'\n", nombre)
+
+	// Extraer lista de parámetros (de tipo []Parametro)
+	parametros := ExtraerParametros(ctx.ListaPar())
+
+	if _, existe := v.Funciones[nombre]; existe {
+		panic(fmt.Sprintf("[VisitFnConParametro] ERROR: Función '%s' ya declarada", nombre))
+	}
+
+	tipoRetorno := "void"
+	if ctx.TipoRetorno() != nil {
+		tipoRetorno = ctx.TipoRetorno().GetText()
+	}
+
+	// Crear entorno para la declaración (para almacenar variables globales o contexto estático)
+	entornoFuncion := symbols.NewEntorno(v.Tabla.EntornoActual, "bloque_funcion_"+nombre)
+	v.Tabla.EntornoActual.Hijos = append(v.Tabla.EntornoActual.Hijos, entornoFuncion)
+
+	fn := Funcion{
+		Nombre:               nombre,
+		Bloque:               ctx.BloqueFuncion(),
+		TipoRetorno:          tipoRetorno,
+		Parametros:           parametros,
+		EntornoDeDeclaracion: entornoFuncion,
+	}
+
+	v.Funciones[nombre] = []Funcion{fn}
+
+	fmt.Printf("[VisitFnConParametro] Función '%s' registrada con tipo de retorno '%s' y %d parámetro(s)\n",
+		nombre, tipoRetorno, len(parametros))
+
+	// === Generar ensamblador sólo de la firma de la función ===
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("\n.global fn_%s\nfn_%s:\n", nombre, nombre))
+	builder.WriteString("    stp x29, x30, [sp, #-16]!\n")
+	builder.WriteString("    mov x29, sp\n")
+	builder.WriteString("    mov sp, x29\n")
+
+	builder.WriteString("    ldp x29, x30, [sp], #16\n")
+	builder.WriteString("    ret\n")
+
+	traducciones.FuncionesBuilder.WriteString(builder.String())
+
+	return nil
+}
+
+func (v *EvalVisitor) VisitLlamadaFuncionesConParametro(ctx *parser.LlamadaFuncionesConParametroContext) interface{} {
+	nombre := ctx.IDENTIFICADOR().GetText()
+
+	funciones, existe := v.Funciones[nombre]
+	if !existe {
+		panic("Función no definida: " + nombre)
+	}
+	funcion := funciones[0]
+
 	entornoAnterior := v.Tabla.EntornoActual
 	nombreAnterior := v.NombreEntorno
 
-	// Crear nombre del nuevo entorno
-	nombreBase := nombreAnterior
+	entornoEjecucion := symbols.NewEntorno(entornoAnterior, "bloque_funcion_ejecucion_"+nombre)
+	entornoAnterior.Hijos = append(entornoAnterior.Hijos, entornoEjecucion)
 
-	// Eliminar prefijo si ya comienza con "bloque_funcion_"
-	if strings.HasPrefix(nombreBase, "bloque_funcion_") {
-		nombreBase = strings.TrimPrefix(nombreBase, "bloque_funcion_")
+	v.Tabla.EntornoActual = entornoEjecucion
+	v.NombreEntorno = "bloque_funcion_ejecucion_" + nombre
+
+	defer func() {
+		v.Tabla.EntornoActual = entornoAnterior
+		v.NombreEntorno = nombreAnterior
+	}()
+
+	// Validar y declarar parámetros
+	parametros := funcion.Parametros
+	args := ctx.ListaExpr().AllExpresion()
+
+	if len(parametros) != len(args) {
+		panic(fmt.Sprintf("Error: función '%s' esperaba %d parámetros, recibió %d", nombre, len(parametros), len(args)))
 	}
 
-	nombreBloque := "bloque_funcion_" + nombreBase
+	fmt.Println("=== Parámetros declarados ===")
+	for i, par := range parametros {
+		id := par.Nombre
+		tipo := par.Tipo
+		valor := v.Visit(args[i])
 
-	// Crear entorno nuevo solo si no estamos ya dentro del correcto
-	if entornoAnterior.Nombre != nombreBloque {
+		fmt.Printf("-> %s: %v (%s)\n", id, valor, tipo)
+		v.Tabla.DeclararParametro(id, tipo, valor, ctx, v.NombreEntorno)
+
+		// verificar si se guardó
+		sim, ok := v.Tabla.EntornoActual.Simbolos[id]
+		if ok {
+			fmt.Printf("[Debug] Parámetro '%s' registrado como tipo '%s' con valor '%v'\n", sim.ID, sim.TipoSimbolo, sim.Valor)
+		} else {
+			fmt.Printf("[Debug] Falló el registro del parámetro '%s'\n", id)
+		}
+	}
+	fmt.Println("=============================")
+
+	// Ejecutar cuerpo de la función
+	resultado := v.Visit(funcion.Bloque)
+
+	if ret, ok := resultado.(Retorno); ok {
+		return ret.Valor
+	}
+
+	return nil
+}
+
+func (v *EvalVisitor) VisitBloqueFuncion(ctx *parser.BloqueFuncionContext) interface{} {
+	entornoAnterior := v.Tabla.EntornoActual
+	nombreAnterior := v.NombreEntorno
+
+	// Solo crear nuevo entorno si no estás en ejecución de función
+	if !strings.HasPrefix(v.Tabla.EntornoActual.Nombre, "bloque_funcion_ejecucion_") {
+		nombreBase := nombreAnterior
+		nombreBase = strings.TrimPrefix(nombreBase, "bloque_funcion_")
+		nombreBase = strings.TrimPrefix(nombreBase, "temp_ejecucion_")
+		nombreBase = strings.TrimPrefix(nombreBase, "fn_")
+
+		nombreBloque := "bloque_funcion_" + nombreBase
+
 		nuevo := symbols.NewEntorno(entornoAnterior, nombreBloque)
 		entornoAnterior.Hijos = append(entornoAnterior.Hijos, nuevo)
 
 		v.Tabla.EntornoActual = nuevo
 		v.NombreEntorno = nombreBloque
+	} else {
+		fmt.Printf("[VisitBloqueFuncion] Ya estás en entorno válido: %s\n", v.Tabla.EntornoActual.Nombre)
 	}
 
 	defer func() {
@@ -403,7 +515,14 @@ func (v *EvalVisitor) VisitBloqueFuncion(ctx *parser.BloqueFuncionContext) inter
 		v.NombreEntorno = nombreAnterior
 	}()
 
-	// Visitar instrucciones y capturar si hay retorno
+	fmt.Println("=== [VisitBloqueFuncion] Parámetros en el entorno actual ===")
+	for id, sim := range v.Tabla.EntornoActual.Simbolos {
+		if sim.TipoSimbolo == symbols.Parametro {
+			fmt.Printf("-> %s = %v (tipo %s)\n", id, sim.Valor, sim.TipoDato)
+		}
+	}
+	fmt.Println("======================================")
+
 	var resultado interface{}
 	for _, instr := range ctx.AllInstruccion() {
 		res := v.Visit(instr)
@@ -413,7 +532,6 @@ func (v *EvalVisitor) VisitBloqueFuncion(ctx *parser.BloqueFuncionContext) inter
 		}
 	}
 
-	// Visitar expresiones restantes (por si no están dentro de instrucción)
 	if resultado == nil {
 		for _, expr := range ctx.AllExpresion() {
 			res := v.Visit(expr)
@@ -551,6 +669,9 @@ func (v *EvalVisitor) VisitExpresion(ctx *parser.ExpresionContext) interface{} {
 		}
 
 		panic("Función no definida: " + nombreFuncion)
+	}
+	if ctx.LlamadaFuncionesConParametro() != nil {
+		return v.VisitLlamadaFuncionesConParametro(ctx.LlamadaFuncionesConParametro().(*parser.LlamadaFuncionesConParametroContext))
 	}
 
 	/* EXPRESIONES NATIVAS */
@@ -772,4 +893,17 @@ func EmitirCodigoCompleto(puntoEntrada string) string {
 	startCode.WriteString(traducciones.FuncionesBuilder.String())
 
 	return ".data\n" + traducciones.DataBuilder.String() + "\n" + startCode.String()
+}
+
+func ExtraerParametros(ctx parser.IListaParContext) []Parametro {
+	var parametros []Parametro
+	if ctx == nil {
+		return parametros
+	}
+	for _, p := range ctx.AllParametro() {
+		nombre := p.IDENTIFICADOR().GetText()
+		tipo := p.Tipos().GetText()
+		parametros = append(parametros, Parametro{Nombre: nombre, Tipo: tipo})
+	}
+	return parametros
 }

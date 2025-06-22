@@ -11,9 +11,10 @@ import (
 
 // Tipos de símbolos
 const (
-	Variable = "Variable"
-	Funcion  = "Función"
-	Metodo   = "Método"
+	Variable  = "Variable"
+	Funcion   = "Función"
+	Metodo    = "Método"
+	Parametro = "Parámetro"
 )
 
 // Tipos de datos
@@ -61,6 +62,19 @@ func NewEntorno(padre *Entorno, nombre string) *Entorno {
 		Simbolos: make(map[string]*Simbolo),
 		Hijos:    []*Entorno{},
 	}
+}
+func (t *TablaSimbolos) DeclararParametro(nombre, tipo string, valor interface{}, ctx antlr.ParserRuleContext, entorno string) {
+	simbolo := &Simbolo{
+		ID:          nombre,
+		TipoSimbolo: Parametro,
+		TipoDato:    tipo,
+		Ambito:      entorno,
+		Linea:       ctx.GetStart().GetLine(),
+		Columna:     ctx.GetStart().GetColumn(),
+		Valor:       valor,
+	}
+
+	t.EntornoActual.Simbolos[nombre] = simbolo
 }
 
 func (ts *TablaSimbolos) Obtener(nombre string) *Simbolo {
