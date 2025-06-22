@@ -15,13 +15,36 @@ import (
 
 var contadorBloques int = 0
 
+type Funcion struct {
+	Nombre               string
+	TipoRetorno          string
+	Parametros           []Parametro
+	Bloque               antlr.ParseTree
+	ValorRetorno         interface{}
+	EntornoDeDeclaracion *symbols.Entorno
+}
+
+type Parametro struct {
+	Nombre string
+	Tipo   string
+}
+
+type Retorno struct {
+	Valor interface{}
+}
+
 type EvalVisitor struct {
 	*parser.BasegramaticaVisitor
-	Entorno   map[string]interface{}
-	Console   *strings.Builder
-	OutputASM strings.Builder
-	Tabla     *symbols.TablaSimbolos
+	Entorno       map[string]interface{}
+	Console       *strings.Builder
+	OutputASM     strings.Builder
+	DataSection   strings.Builder
+	Tabla         *symbols.TablaSimbolos
+	Funciones     map[string][]Funcion
+	NombreEntorno string
 }
+
+var funcionesGeneradas map[string]bool
 
 func NewEvalVisitor(tabla *symbols.TablaSimbolos) *EvalVisitor {
 	return &EvalVisitor{
@@ -29,6 +52,7 @@ func NewEvalVisitor(tabla *symbols.TablaSimbolos) *EvalVisitor {
 		Tabla:                tabla,
 		Console:              &strings.Builder{},
 		Entorno:              make(map[string]interface{}),
+		Funciones:            make(map[string][]Funcion),
 	}
 }
 
@@ -44,17 +68,33 @@ func (v *EvalVisitor) Visit(tree antlr.ParseTree) interface{} {
 
 // inicio de la gramatica
 func (v *EvalVisitor) VisitInit(ctx *parser.InitContext) interface{} {
-	traducciones.ResetearCodigoASM()
+	traducciones.ResetearCodigoASM() // Limpia TextBuilder, FuncionesBuilder, DataBuilder
+	v.Funciones = make(map[string][]Funcion)
+
 	var resultados []interface{}
 	for _, instr := range ctx.AllInstrucciones() {
-		res := v.Visit(instr)
-		if res != nil {
-			resultados = append(resultados, res)
+		if esFuncion(instr) {
+			v.Visit(instr) // Se genera código en FuncionesBuilder
+		} else {
+			res := v.Visit(instr) // Se genera ASM en TextBuilder
+			if res != nil {
+				resultados = append(resultados, res)
+			}
 		}
 	}
 	v.GenerarASMFinal()
-	contadorBloques = 0
 	return resultados
+}
+
+func esFuncion(instr antlr.ParseTree) bool {
+	switch instr.(type) {
+	case *parser.FnSinParametroContext:
+		return true
+	case *parser.FnConParametroContext:
+		return true
+	default:
+		return false
+	}
 }
 
 // visitar instrucciones
@@ -85,9 +125,13 @@ func (v *EvalVisitor) VisitInstruccion(ctx *parser.InstruccionContext) interface
 	if ctx.AsignacionMultiple() != nil {
 		return v.Visit(ctx.AsignacionMultiple())
 	}
-	if ctx.Bloque() != nil {
-		return v.Visit(ctx.Bloque())
+	if ctx.FnSinParametro() != nil {
+		return v.Visit(ctx.FnSinParametro())
 	}
+	if ctx.LlamadaFuncionesSinParametro() != nil {
+		return v.Visit(ctx.LlamadaFuncionesSinParametro())
+	}
+
 	return nil
 }
 
@@ -242,16 +286,104 @@ func (v *EvalVisitor) VisitAsignacionMultiple(ctx *parser.AsignacionMultipleCont
 }
 
 // ========= FUNCIONES =========
-func (v *EvalVisitor) VisitBloque(ctx *parser.BloqueContext) interface{} {
-	// Crear un nuevo entorno hijo
-	nuevo := symbols.NewEntorno(v.Tabla.EntornoActual, generarNombreUnico("bloque", v.Tabla.EntornoActual.Nombre))
+func (v *EvalVisitor) VisitFnSinParametro(ctx *parser.FnSinParametroContext) interface{} {
+	nombre := ctx.IDENTIFICADOR().GetText()
 
+	// Verifica si la función ya fue declarada
+	if _, existe := v.Funciones[nombre]; existe {
+		panic("Función ya declarada: " + nombre)
+	}
+
+	// Crea la función con el bloque parseable
+	fn := Funcion{
+		Nombre:      nombre,
+		Bloque:      ctx.BloqueFuncion(),
+		TipoRetorno: "void", // ajustar si soportas tipos
+	}
+
+	// Guarda función en el mapa
+	v.Funciones[nombre] = []Funcion{fn}
+
+	// Builder temporal para el código ensamblador de esta función
+	var builderFunc strings.Builder
+
+	// Cabecera de función
+	builderFunc.WriteString(fmt.Sprintf("\n.global fn_%s\nfn_%s:\n", nombre, nombre))
+	builderFunc.WriteString("    stp x29, x30, [sp, #-16]!\n")
+	builderFunc.WriteString("    mov x29, sp\n")
+	builderFunc.WriteString("    mov sp, x29\n")
+
+	// Guarda builder global y reemplaza por uno local vacío
+	textoGlobal := traducciones.TextBuilder
+	traducciones.TextBuilder = strings.Builder{}
+
+	// Cambia entorno: crea nuevo entorno para esta función, enlazado al actual
+	entornoAnt := v.Tabla.EntornoActual
+	v.Tabla.EntornoActual = symbols.NewEntorno(entornoAnt, "fn_"+nombre)
+	// Agrega hijo
+	v.Tabla.EntornoActual.Padre.Hijos = append(v.Tabla.EntornoActual.Padre.Hijos, v.Tabla.EntornoActual)
+
+	// Cambia nombre de entorno actual para que se sepa que estás dentro de la función
+	nombreAnt := v.NombreEntorno
+	v.NombreEntorno = "fn_" + nombre
+
+	// Visita el bloque de instrucciones dentro de la función para generar código ASM local
+	if fn.Bloque != nil {
+		v.Visit(fn.Bloque)
+	}
+
+	// Agrega el código generado local al builder temporal
+	builderFunc.WriteString(traducciones.TextBuilder.String())
+
+	// Epílogo de función
+	builderFunc.WriteString("    ldp x29, x30, [sp], #16\n")
+	builderFunc.WriteString("    ret\n")
+
+	// Restaura builder global y entorno original
+	traducciones.TextBuilder = textoGlobal
+	v.Tabla.EntornoActual = entornoAnt
+	v.NombreEntorno = nombreAnt
+
+	// Agrega el código de la función al builder separado de funciones
+	traducciones.FuncionesBuilder.WriteString(builderFunc.String())
+
+	return nil
+}
+
+func (v *EvalVisitor) VisitLlamadaFuncionesSinParametro(ctx *parser.LlamadaFuncionesSinParametroContext) interface{} {
+	nombre := ctx.IDENTIFICADOR().GetText()
+
+	if _, existe := v.Funciones[nombre]; !existe {
+		panic("Función no definida: " + nombre)
+	}
+
+	// Insertar el call directo en el builder actual (puede ser global o local)
+	traducciones.TextBuilder.WriteString(fmt.Sprintf("    bl fn_%s\n", nombre))
+
+	return nil
+}
+
+func (v *EvalVisitor) VisitBloqueFuncion(ctx *parser.BloqueFuncionContext) interface{} {
+	// Preparar nombre del entorno padre
+	nombre := v.NombreEntorno
+	if strings.HasPrefix(nombre, "fn_") {
+		nombre = strings.TrimPrefix(nombre, "fn_")
+		nombre = "Funcion_" + nombre
+	}
+
+	// Crear nuevo entorno con nombre único
+	nuevo := symbols.NewEntorno(v.Tabla.EntornoActual, generarNombreUnico("bloque", nombre))
 	v.Tabla.EntornoActual.Hijos = append(v.Tabla.EntornoActual.Hijos, nuevo)
 
+	// Guardar contexto anterior
 	entornoAnterior := v.Tabla.EntornoActual
-	v.Tabla.EntornoActual = nuevo
+	nombreAnterior := v.NombreEntorno
 
-	// Visitar todas las instrucciones y expresiones dentro del bloque
+	// Actualizar contexto actual
+	v.Tabla.EntornoActual = nuevo
+	v.NombreEntorno = nuevo.Nombre
+
+	// Visitar instrucciones y expresiones
 	for _, instr := range ctx.AllInstruccion() {
 		v.Visit(instr)
 	}
@@ -259,8 +391,9 @@ func (v *EvalVisitor) VisitBloque(ctx *parser.BloqueContext) interface{} {
 		v.Visit(expr)
 	}
 
-	// Restaurar entorno anterior
+	// Restaurar contexto anterior
 	v.Tabla.EntornoActual = entornoAnterior
+	v.NombreEntorno = nombreAnterior
 
 	return nil
 }
@@ -275,6 +408,7 @@ func (v *EvalVisitor) VisitPrint(ctx *parser.PrintContext) interface{} {
 		texto := valorAString(val)
 
 		traducciones.GenerarCodigoPrint(texto, false)
+
 	}
 	return nil
 }
@@ -332,9 +466,11 @@ mov x0, #%d
 }
 
 // ========= GENERADOR DE ASM =========
-
 func (v *EvalVisitor) GenerarASMFinal() string {
-	asm := traducciones.EmitirCodigoCompleto()
+	// EmitirCodigoCompleto debe armar la sección .data + globales + funciones + _start con el punto de entrada correcto
+	asm := EmitirCodigoCompleto(v.NombreEntorno)
+
+	v.OutputASM.Reset()
 	v.OutputASM.WriteString(asm)
 
 	fmt.Println("=== Código ensamblador generado ===")
@@ -346,6 +482,22 @@ func (v *EvalVisitor) GenerarASMFinal() string {
 
 // ========= EXPRESIONES =========
 func (v *EvalVisitor) VisitExpresion(ctx *parser.ExpresionContext) interface{} {
+	if ctx.LlamadaFuncionesSinParametro() != nil {
+		// Obtener el nombre de la función
+		nombreFuncion := ctx.LlamadaFuncionesSinParametro().IDENTIFICADOR().GetText()
+
+		// Verificar si la función existe
+		if funciones, existe := v.Funciones[nombreFuncion]; existe {
+			resultado := v.Visit(funciones[0].Bloque)
+
+			// Manejar el valor de retorno
+			if ret, ok := resultado.(Retorno); ok {
+				return ret.Valor
+			}
+			return nil
+		}
+		panic("Función no definida: " + nombreFuncion)
+	}
 	/* EXPRESIONES NATIVAS */
 	if ctx.IDENTIFICADOR() != nil {
 		id := ctx.GetText()
@@ -524,4 +676,50 @@ func tiposCompatibles(tipoVar string, tipoValor string) bool {
 func generarNombreUnico(base string, padre string) string {
 	contadorBloques++
 	return fmt.Sprintf("%s_%s_%d", base, padre, contadorBloques)
+}
+
+func GenerarASMFuncion(fn Funcion, v *EvalVisitor) {
+	asm := fmt.Sprintf("\n # Función: %s\n", fn.Nombre)
+	asm += fmt.Sprintf(".global fn_%s\n", fn.Nombre)
+	asm += fmt.Sprintf("fn_%s:\n", fn.Nombre)
+	asm += "    stp x29, x30, [sp, #-16]!\n"
+	asm += "    mov x29, sp\n"
+
+	if fn.Bloque != nil {
+		if codigo, ok := v.Visit(fn.Bloque).(string); ok {
+			asm += codigo
+		}
+	}
+
+	asm += "    mov sp, x29\n"
+	asm += "    ldp x29, x30, [sp], #16\n"
+	asm += "    ret\n"
+
+	traducciones.TextBuilder.WriteString(asm)
+}
+
+func EmitirCodigoCompleto(puntoEntrada string) string {
+	var startCode strings.Builder
+
+	startCode.WriteString(".global _start\n")
+	startCode.WriteString(".text\n")
+	startCode.WriteString("_start:\n")
+
+	// Primero inserta TODO el código global fuera de funciones
+	startCode.WriteString(traducciones.TextBuilder.String())
+
+	// Luego, salto a la función principal si existe
+	if puntoEntrada != "" && puntoEntrada != "global" {
+		startCode.WriteString(fmt.Sprintf("    bl fn_%s\n", puntoEntrada))
+	}
+
+	// Código para salir del programa
+	startCode.WriteString("    mov x0, #0\n")
+	startCode.WriteString("    mov x8, #93\n")
+	startCode.WriteString("    svc #0\n\n")
+
+	// Finalmente agrega todas las funciones juntas
+	startCode.WriteString(traducciones.FuncionesBuilder.String())
+
+	return ".data\n" + traducciones.DataBuilder.String() + "\n" + startCode.String()
 }

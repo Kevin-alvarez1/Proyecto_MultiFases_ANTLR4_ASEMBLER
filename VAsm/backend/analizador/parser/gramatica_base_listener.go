@@ -78,6 +78,12 @@ func (s *BasegramaticaListener) EnterAsignacionMultiple(ctx *AsignacionMultipleC
 // ExitAsignacionMultiple is called when production asignacionMultiple is exited.
 func (s *BasegramaticaListener) ExitAsignacionMultiple(ctx *AsignacionMultipleContext) {}
 
+// EnterBloqueFuncion is called when production bloqueFuncion is entered.
+func (s *BasegramaticaListener) EnterBloqueFuncion(ctx *BloqueFuncionContext) {}
+
+// ExitBloqueFuncion is called when production bloqueFuncion is exited.
+func (s *BasegramaticaListener) ExitBloqueFuncion(ctx *BloqueFuncionContext) {}
+
 // EnterBloque is called when production bloque is entered.
 func (s *BasegramaticaListener) EnterBloque(ctx *BloqueContext) {}
 

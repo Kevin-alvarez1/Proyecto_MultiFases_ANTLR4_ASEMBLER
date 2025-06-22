@@ -34,6 +34,9 @@ type gramaticaListener interface {
 	// EnterAsignacionMultiple is called when entering the asignacionMultiple production.
 	EnterAsignacionMultiple(c *AsignacionMultipleContext)
 
+	// EnterBloqueFuncion is called when entering the bloqueFuncion production.
+	EnterBloqueFuncion(c *BloqueFuncionContext)
+
 	// EnterBloque is called when entering the bloque production.
 	EnterBloque(c *BloqueContext)
 
@@ -183,6 +186,9 @@ type gramaticaListener interface {
 
 	// ExitAsignacionMultiple is called when exiting the asignacionMultiple production.
 	ExitAsignacionMultiple(c *AsignacionMultipleContext)
+
+	// ExitBloqueFuncion is called when exiting the bloqueFuncion production.
+	ExitBloqueFuncion(c *BloqueFuncionContext)
 
 	// ExitBloque is called when exiting the bloque production.
 	ExitBloque(c *BloqueContext)

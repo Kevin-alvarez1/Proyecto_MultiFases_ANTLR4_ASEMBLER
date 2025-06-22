@@ -34,6 +34,9 @@ type gramaticaVisitor interface {
 	// Visit a parse tree produced by gramaticaParser#asignacionMultiple.
 	VisitAsignacionMultiple(ctx *AsignacionMultipleContext) interface{}
 
+	// Visit a parse tree produced by gramaticaParser#bloqueFuncion.
+	VisitBloqueFuncion(ctx *BloqueFuncionContext) interface{}
+
 	// Visit a parse tree produced by gramaticaParser#bloque.
 	VisitBloque(ctx *BloqueContext) interface{}
 

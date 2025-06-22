@@ -255,6 +255,24 @@ func (ts *TablaSimbolos) ToString() string {
 
 	return sb.String()
 }
+func (e *Entorno) ExisteSimbolo(nombre string) bool {
+	_, existe := e.Simbolos[nombre] // Asumiendo que `Simbolos` es map[string]*Simbolo
+	return existe
+}
+func (e *Entorno) AgregarSimbolo(id, tipoSimbolo, tipoDato, ambito string, linea, columna int, valor interface{}) {
+	if e.Simbolos == nil {
+		e.Simbolos = make(map[string]*Simbolo)
+	}
+	e.Simbolos[id] = &Simbolo{
+		ID:          id,
+		TipoSimbolo: tipoSimbolo,
+		TipoDato:    tipoDato,
+		Ambito:      ambito,
+		Linea:       linea,
+		Columna:     columna,
+		Valor:       valor,
+	}
+}
 
 func (ts *TablaSimbolos) Imprimir() {
 	var recorrer func(e *Entorno, nivel int)
