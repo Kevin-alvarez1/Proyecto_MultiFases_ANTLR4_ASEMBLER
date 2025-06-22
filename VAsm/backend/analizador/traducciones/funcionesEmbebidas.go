@@ -9,6 +9,7 @@ var contadorEtiqueta int = 0
 var DataBuilder strings.Builder
 var TextBuilder strings.Builder
 var mensajesUnicos = make(map[string]string)
+var FuncionesBuilder strings.Builder
 
 func GenerarCodigoPrint(msg string, addNewline bool) {
 	if addNewline {
@@ -47,22 +48,10 @@ func escape(input string) string {
 	return input
 }
 
-func EmitirCodigoCompleto(principal string) string {
-	encabezado := fmt.Sprintf(`.global _start
-.text
-_start:
-    bl fn_%s
-    mov x0, #0
-    mov x8, #93
-    svc #0
-`, principal)
-
-	return ".data\n" + DataBuilder.String() + "\n" + encabezado + "\n" + TextBuilder.String()
-}
-
 func ResetearCodigoASM() {
 	contadorEtiqueta = 0
 	DataBuilder.Reset()
 	TextBuilder.Reset()
 	mensajesUnicos = make(map[string]string)
+	FuncionesBuilder.Reset()
 }
