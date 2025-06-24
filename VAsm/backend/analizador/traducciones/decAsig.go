@@ -215,3 +215,28 @@ func reservarVariableEnData(id string, tipo string) {
 	}
 	variablesReservadas[id] = true
 }
+
+func GenerarSumaASM(id1, id2 string, builder *strings.Builder, tipo string) {
+    switch tipo {
+    case "float":
+        builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+        builder.WriteString("ldr d0, [x10]\n")
+        builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+        builder.WriteString("ldr d1, [x11]\n")
+        builder.WriteString("fadd d2, d0, d1\n")
+    
+    case "string":
+        builder.WriteString(fmt.Sprintf("adr x0, %s\n", id1))
+        builder.WriteString(fmt.Sprintf("adr x1, %s\n", id2))
+        builder.WriteString("bl str_concat\n")
+        builder.WriteString("adr x10, str_temp\n")
+        builder.WriteString("str x0, [x10]\n")
+    
+    default: // int y otros tipos numéricos
+        builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+        builder.WriteString("ldr x10, [x10]\n")
+        builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+        builder.WriteString("ldr x11, [x11]\n")
+        builder.WriteString("add x12, x10, x11\n")
+    }
+}

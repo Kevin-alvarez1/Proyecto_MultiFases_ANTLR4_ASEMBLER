@@ -674,6 +674,32 @@ func (v *EvalVisitor) VisitExpresion(ctx *parser.ExpresionContext) interface{} {
 		return v.VisitLlamadaFuncionesConParametro(ctx.LlamadaFuncionesConParametro().(*parser.LlamadaFuncionesConParametroContext))
 	}
 
+	/*	OPERACIONE ARITMETICAS */
+	if ctx.MAS() != nil {
+		left := ctx.Expresion(0)
+		right := ctx.Expresion(1)
+
+		lid := left.GetText()
+		rid := right.GetText()
+
+		simboloL := v.Tabla.EntornoActual.BuscarSimbolo(lid)
+		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
+
+		if simboloL != nil && simboloR != nil {
+			tipo := simboloL.TipoDato
+			traducciones.GenerarSumaASM(lid, rid, &v.OutputASM, tipo)
+
+			switch tipo {
+			case "float":
+            	return simboloL.Valor.(float64) + simboloR.Valor.(float64)
+			case "string":
+				return simboloL.Valor.(string) + simboloR.Valor.(string)
+			default: 
+				return simboloL.Valor.(int) + simboloR.Valor.(int)
+			}
+		}
+	}
+
 	/* EXPRESIONES NATIVAS */
 	if ctx.IDENTIFICADOR() != nil {
 		id := ctx.GetText()

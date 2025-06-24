@@ -278,7 +278,7 @@ func BuildMainWindow(win fyne.Window) *Editor {
 			tmpPNG.Close()
 			// descomentar aqui para calificacion
 
-			// 3. Convertir SVG a PNG usando rsvg-convert (debes tenerlo instalado)
+/*			// 3. Convertir SVG a PNG usando rsvg-convert (debes tenerlo instalado)
 			cmd := exec.Command("rsvg-convert", "-o", tmpPNG.Name(), tmpSVG.Name())
 			err = cmd.Run()
 			if err != nil {
@@ -294,7 +294,7 @@ func BuildMainWindow(win fyne.Window) *Editor {
 			editor.ImageScroll.Content = pngImage
 			editor.ImageScroll.Refresh()
 
-			// cerrar comentario para calificacion arriba linea 295
+			// cerrar comentario para calificacion arriba linea 295*/
 			var texto string
 			if resultados, ok := result.([]interface{}); ok {
 				for _, v := range resultados {
