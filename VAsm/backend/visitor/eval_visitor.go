@@ -726,17 +726,83 @@ func (v *EvalVisitor) VisitExpresion(ctx *parser.ExpresionContext) interface{} {
 		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
 
 		if simboloL != nil && simboloR != nil {
-			tipo := simboloL.TipoDato
+			tipoL := simboloL.TipoDato
+			tipoR := simboloR.TipoDato
 
-			// Asegurar que estén reservadas en .data
-			traducciones.ReservarVariableSiNoExiste(lid, tipo)
-			traducciones.ReservarVariableSiNoExiste(rid, tipo)
+			// Inferir tipo final (si uno es float, el resultado debe ser float)
+			var tipoFinal string
+			if tipoL == "float" || tipoR == "float" {
+				tipoFinal = "float"
+			} else if tipoL == "string" && tipoR == "string" {
+				tipoFinal = "string"
+			} else {
+				tipoFinal = "int"
+			}
 
-			traducciones.GenerarSumaASM(lid, rid, &traducciones.FuncionesBuilder, tipo)
+			// Reservar variables si no existen
+			traducciones.ReservarVariableSiNoExiste(lid, tipoL)
+			traducciones.ReservarVariableSiNoExiste(rid, tipoR)
+
+			// Conversiones necesarias si mezcla int y float
+			if tipoFinal == "float" {
+				if tipoL == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("// Convertir %s de int a float\n", lid))
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr x10, [x10]\n")
+					v.OutputASM.WriteString("scvtf s0, x10\n")
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", lid))
+					v.OutputASM.WriteString("str s0, [x11]\n\n")
+
+					simboloL.TipoDato = "float"
+					simboloL.Valor = float64(simboloL.Valor.(int))
+				}
+				if tipoR == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("// Convertir %s de int a float\n", rid))
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", rid))
+					v.OutputASM.WriteString("ldr x10, [x10]\n")
+					v.OutputASM.WriteString("scvtf s0, x10\n")
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("str s0, [x11]\n\n")
+
+					simboloR.TipoDato = "float"
+					simboloR.Valor = float64(simboloR.Valor.(int))
+				}
+			}
+
+			// Generar código ASM de la suma
+			traducciones.GenerarSumaASM(lid, rid, &traducciones.FuncionesBuilder, tipoFinal)
 			v.OutputASM.WriteString("    bl add\n")
-			switch tipo {
+			// Manejar string + int o string + float
+			if (tipoL == "string" && (tipoR == "int" || tipoR == "float")) ||
+			(tipoR == "string" && (tipoL == "int" || tipoL == "float")) {
+
+				var strVal string
+				var numVal string
+
+				if tipoL == "string" {
+					strVal = simboloL.Valor.(string)
+					if tipoR == "int" {
+						numVal = fmt.Sprintf("%d", simboloR.Valor.(int))
+					} else {
+						numVal = fmt.Sprintf("%g", simboloR.Valor.(float64))
+					}
+					return strVal + numVal
+				}
+
+				if tipoR == "string" {
+					strVal = simboloR.Valor.(string)
+					if tipoL == "int" {
+						numVal = fmt.Sprintf("%d", simboloL.Valor.(int))
+					} else {
+						numVal = fmt.Sprintf("%g", simboloL.Valor.(float64))
+					}
+					return numVal + strVal
+				}
+			}
+			// Ejecutar la operación en Go para retornar el resultado (usado por el Visitor)
+			switch tipoFinal {
 			case "float":
-				return simboloL.Valor.(float64) + simboloR.Valor.(float64)
+				return toFloat(simboloL.Valor) + toFloat(simboloR.Valor)
 			case "string":
 				return simboloL.Valor.(string) + simboloR.Valor.(string)
 			default:
@@ -744,6 +810,234 @@ func (v *EvalVisitor) VisitExpresion(ctx *parser.ExpresionContext) interface{} {
 			}
 		}
 	}
+
+	if ctx.MENOS() != nil {
+		left := ctx.Expresion(0)
+		right := ctx.Expresion(1)
+
+		lid := left.GetText()
+		rid := right.GetText()
+
+		simboloL := v.Tabla.EntornoActual.BuscarSimbolo(lid)
+		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
+
+		if simboloL != nil && simboloR != nil {
+			tipoL := simboloL.TipoDato
+			tipoR := simboloR.TipoDato
+
+			var tipoFinal string
+			if tipoL == "float" || tipoR == "float" {
+				tipoFinal = "float"
+			} else {
+				tipoFinal = "int"
+			}
+
+			if tipoFinal != "int" && tipoFinal != "float" {
+				fmt.Println("Error: tipo no compatible para resta")
+				return nil
+			}
+
+			traducciones.ReservarVariableSiNoExiste(lid, tipoL)
+			traducciones.ReservarVariableSiNoExiste(rid, tipoR)
+
+			if tipoFinal == "float" {
+				if tipoL == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("// Convertir %s de int a float\n", lid))
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr x10, [x10]\n")
+					v.OutputASM.WriteString("scvtf s0, x10\n")
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", lid))
+					v.OutputASM.WriteString("str s0, [x11]\n\n")
+
+					simboloL.TipoDato = "float"
+					simboloL.Valor = float64(simboloL.Valor.(int))
+				}
+				if tipoR == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("// Convertir %s de int a float\n", rid))
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", rid))
+					v.OutputASM.WriteString("ldr x10, [x10]\n")
+					v.OutputASM.WriteString("scvtf s0, x10\n")
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("str s0, [x11]\n\n")
+
+					simboloR.TipoDato = "float"
+					simboloR.Valor = float64(simboloR.Valor.(int))
+				}
+			}
+
+			traducciones.GenerarRestaASM(lid, rid, &traducciones.FuncionesBuilder, tipoFinal)
+			v.OutputASM.WriteString("    bl sub\n")
+
+			switch tipoFinal {
+			case "float":
+				return toFloat(simboloL.Valor) - toFloat(simboloR.Valor)
+			default:
+				return simboloL.Valor.(int) - simboloR.Valor.(int)
+			}
+		}
+	}
+
+	if ctx.POR() != nil {
+		left := ctx.Expresion(0)
+		right := ctx.Expresion(1)
+
+		lid := left.GetText()
+		rid := right.GetText()
+
+		simboloL := v.Tabla.EntornoActual.BuscarSimbolo(lid)
+		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
+
+		if simboloL != nil && simboloR != nil {
+			tipoL := simboloL.TipoDato
+			tipoR := simboloR.TipoDato
+
+			var tipoFinal string
+			if tipoL == "float" || tipoR == "float" {
+				tipoFinal = "float"
+			} else {
+				tipoFinal = "int"
+			}
+
+			if tipoFinal != "int" && tipoFinal != "float" {
+				fmt.Println("Error: tipos no compatibles para multiplicación")
+				return nil
+			}
+
+			traducciones.ReservarVariableSiNoExiste(lid, tipoL)
+			traducciones.ReservarVariableSiNoExiste(rid, tipoR)
+
+			if tipoFinal == "float" {
+				if tipoL == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("// Convertir %s de int a float\n", lid))
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr x10, [x10]\n")
+					v.OutputASM.WriteString("scvtf s0, x10\n")
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", lid))
+					v.OutputASM.WriteString("str s0, [x11]\n\n")
+
+					simboloL.TipoDato = "float"
+					simboloL.Valor = float64(simboloL.Valor.(int))
+				}
+				if tipoR == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("// Convertir %s de int a float\n", rid))
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", rid))
+					v.OutputASM.WriteString("ldr x10, [x10]\n")
+					v.OutputASM.WriteString("scvtf s0, x10\n")
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("str s0, [x11]\n\n")
+
+					simboloR.TipoDato = "float"
+					simboloR.Valor = float64(simboloR.Valor.(int))
+				}
+			}
+
+			traducciones.GenerarMultiplicacionASM(lid, rid, &traducciones.FuncionesBuilder, tipoFinal)
+			v.OutputASM.WriteString("    bl mul\n")
+
+			switch tipoFinal {
+			case "float":
+				return toFloat(simboloL.Valor) * toFloat(simboloR.Valor)
+			default:
+				return simboloL.Valor.(int) * simboloR.Valor.(int)
+			}
+		}
+	}
+
+	if ctx.DIV() != nil {
+		left := ctx.Expresion(0)
+		right := ctx.Expresion(1)
+
+		lid := left.GetText()
+		rid := right.GetText()
+
+		simboloL := v.Tabla.EntornoActual.BuscarSimbolo(lid)
+		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
+
+		if simboloL != nil && simboloR != nil {
+			tipoL := simboloL.TipoDato
+			tipoR := simboloR.TipoDato
+
+			var tipoFinal string
+			if tipoL == "float" || tipoR == "float" {
+				tipoFinal = "float"
+			} else {
+				tipoFinal = "int"
+			}
+
+			if tipoFinal != "int" && tipoFinal != "float" {
+				fmt.Println("Error: tipos no compatibles para división")
+				return nil
+			}
+
+			traducciones.ReservarVariableSiNoExiste(lid, tipoL)
+			traducciones.ReservarVariableSiNoExiste(rid, tipoR)
+
+			if tipoFinal == "float" {
+				if tipoL == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("// Convertir %s de int a float\n", lid))
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr x10, [x10]\n")
+					v.OutputASM.WriteString("scvtf s0, x10\n")
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", lid))
+					v.OutputASM.WriteString("str s0, [x11]\n\n")
+
+					simboloL.TipoDato = "float"
+					simboloL.Valor = float64(simboloL.Valor.(int))
+				}
+				if tipoR == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("// Convertir %s de int a float\n", rid))
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", rid))
+					v.OutputASM.WriteString("ldr x10, [x10]\n")
+					v.OutputASM.WriteString("scvtf s0, x10\n")
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("str s0, [x11]\n\n")
+
+					simboloR.TipoDato = "float"
+					simboloR.Valor = float64(simboloR.Valor.(int))
+				}
+			}
+
+			traducciones.GenerarDivisionASM(lid, rid, &traducciones.FuncionesBuilder, tipoFinal)
+			v.OutputASM.WriteString("    bl div\n")
+
+			switch tipoFinal {
+			case "float":
+				return toFloat(simboloL.Valor) / toFloat(simboloR.Valor)
+			default:
+				return simboloL.Valor.(int) / simboloR.Valor.(int)
+			}
+		}
+	}
+
+	if ctx.MODULO() != nil {
+		left := ctx.Expresion(0)
+		right := ctx.Expresion(1)
+
+		lid := left.GetText()
+		rid := right.GetText()
+
+		simboloL := v.Tabla.EntornoActual.BuscarSimbolo(lid)
+		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
+
+		if simboloL != nil && simboloR != nil {
+			tipoL := simboloL.TipoDato
+			tipoR := simboloR.TipoDato
+
+			if tipoL != "int" || tipoR != "int" {
+				fmt.Println("Error: solo se permite módulo entre enteros")
+				return nil
+			}
+
+			traducciones.ReservarVariableSiNoExiste(lid, tipoL)
+			traducciones.ReservarVariableSiNoExiste(rid, tipoR)
+
+			traducciones.GenerarModuloASM(lid, rid, &traducciones.FuncionesBuilder)
+			v.OutputASM.WriteString("    bl mod\n")
+
+			return simboloL.Valor.(int) % simboloR.Valor.(int)
+		}
+	}
+
 
 	if ctx.PAR1() != nil && ctx.PAR2() != nil {
 		return v.Visit(ctx.Expresion(0))
@@ -764,6 +1058,16 @@ func (v *EvalVisitor) VisitExpresion(ctx *parser.ExpresionContext) interface{} {
 }
 
 // ========= FUNCIONES AUXILIARES =========
+func toFloat(val interface{}) float64 {
+	switch v := val.(type) {
+	case int:
+		return float64(v)
+	case float64:
+		return v
+	default:
+		return 0.0
+	}
+}
 
 func obtenerValores(ctx parser.IListaExprContext, visitor *EvalVisitor) []interface{} {
 	valores := []interface{}{}

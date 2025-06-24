@@ -224,19 +224,157 @@ func GenerarSumaASM(id1, id2 string, builder *strings.Builder, tipo string) stri
 	labelResult := fmt.Sprintf("resultado_suma_%d", contadorSuma)
 	contadorSuma++
 
-	// Reservar variable resultado solo una vez por etiqueta
 	if !variablesReservadas[labelResult] {
 		reservarVariableEnData(labelResult, tipo)
 		variablesReservadas[labelResult] = true
 	}
 
-	// Generar código de suma, usando labelResult
 	builder.WriteString(fmt.Sprintf("\n// Suma %d\n", contadorSuma))
+
+	if tipo == "int" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		builder.WriteString("ldr x10, [x10]\n")
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		builder.WriteString("ldr x11, [x11]\n")
+		builder.WriteString("add x12, x10, x11\n")
+		builder.WriteString(fmt.Sprintf("adr x13, %s\n", labelResult))
+		builder.WriteString("str x12, [x13]\n\n")
+	}
+
+	if tipo == "float" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		builder.WriteString("ldr s0, [x10]\n")
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		builder.WriteString("ldr s1, [x11]\n")
+		builder.WriteString("fadd s2, s0, s1\n")
+		builder.WriteString(fmt.Sprintf("adr x12, %s\n", labelResult))
+		builder.WriteString("str s2, [x12]\n\n")
+	}
+
+	return labelResult
+}
+
+func GenerarRestaASM(id1, id2 string, builder *strings.Builder, tipo string) string {
+	labelResult := fmt.Sprintf("resultado_resta_%d", contadorSuma)
+	contadorSuma++
+
+	if !variablesReservadas[labelResult] {
+		reservarVariableEnData(labelResult, tipo)
+		variablesReservadas[labelResult] = true
+	}
+
+	builder.WriteString(fmt.Sprintf("\n// Resta %d\n", contadorSuma))
+
+	if tipo == "int" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		builder.WriteString("ldr x10, [x10]\n")
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		builder.WriteString("ldr x11, [x11]\n")
+		builder.WriteString("sub x12, x10, x11\n")
+		builder.WriteString(fmt.Sprintf("adr x13, %s\n", labelResult))
+		builder.WriteString("str x12, [x13]\n\n")
+	}
+
+	if tipo == "float" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		builder.WriteString("ldr s0, [x10]\n")
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		builder.WriteString("ldr s1, [x11]\n")
+		builder.WriteString("fsub s2, s0, s1\n")
+		builder.WriteString(fmt.Sprintf("adr x12, %s\n", labelResult))
+		builder.WriteString("str s2, [x12]\n\n")
+	}
+
+	return labelResult
+}
+
+func GenerarMultiplicacionASM(id1, id2 string, builder *strings.Builder, tipo string) string {
+	labelResult := fmt.Sprintf("resultado_mul_%d", contadorSuma)
+	contadorSuma++
+
+	if !variablesReservadas[labelResult] {
+		reservarVariableEnData(labelResult, tipo)
+		variablesReservadas[labelResult] = true
+	}
+
+	builder.WriteString(fmt.Sprintf("\n// Multiplicación %d\n", contadorSuma))
+
+	if tipo == "int" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		builder.WriteString("ldr x10, [x10]\n")
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		builder.WriteString("ldr x11, [x11]\n")
+		builder.WriteString("mul x12, x10, x11\n")
+		builder.WriteString(fmt.Sprintf("adr x13, %s\n", labelResult))
+		builder.WriteString("str x12, [x13]\n\n")
+	}
+
+	if tipo == "float" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		builder.WriteString("ldr s0, [x10]\n")
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		builder.WriteString("ldr s1, [x11]\n")
+		builder.WriteString("fmul s2, s0, s1\n")
+		builder.WriteString(fmt.Sprintf("adr x12, %s\n", labelResult))
+		builder.WriteString("str s2, [x12]\n\n")
+	}
+
+	return labelResult
+}
+
+func GenerarDivisionASM(id1, id2 string, builder *strings.Builder, tipo string) string {
+	labelResult := fmt.Sprintf("resultado_div_%d", contadorSuma)
+	contadorSuma++
+
+	if !variablesReservadas[labelResult] {
+		reservarVariableEnData(labelResult, tipo)
+		variablesReservadas[labelResult] = true
+	}
+
+	builder.WriteString(fmt.Sprintf("\n// División %d\n", contadorSuma))
+
+	if tipo == "int" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		builder.WriteString("ldr x10, [x10]\n")
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		builder.WriteString("ldr x11, [x11]\n")
+		builder.WriteString("sdiv x12, x10, x11\n")
+		builder.WriteString(fmt.Sprintf("adr x13, %s\n", labelResult))
+		builder.WriteString("str x12, [x13]\n\n")
+	}
+
+	if tipo == "float" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		builder.WriteString("ldr s0, [x10]\n")
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		builder.WriteString("ldr s1, [x11]\n")
+		builder.WriteString("fdiv s2, s0, s1\n")
+		builder.WriteString(fmt.Sprintf("adr x12, %s\n", labelResult))
+		builder.WriteString("str s2, [x12]\n\n")
+	}
+
+	return labelResult
+}
+
+func GenerarModuloASM(id1, id2 string, builder *strings.Builder) string {
+	labelResult := fmt.Sprintf("resultado_mod_%d", contadorSuma)
+	contadorSuma++
+
+	if !variablesReservadas[labelResult] {
+		reservarVariableEnData(labelResult, "int")
+		variablesReservadas[labelResult] = true
+	}
+
+	builder.WriteString(fmt.Sprintf("\n// Módulo %d\n", contadorSuma))
 	builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
 	builder.WriteString("ldr x10, [x10]\n")
 	builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
 	builder.WriteString("ldr x11, [x11]\n")
-	builder.WriteString("add x12, x10, x11\n")
+
+	builder.WriteString("sdiv x12, x10, x11\n")
+	builder.WriteString("mul x12, x12, x11\n")
+	builder.WriteString("sub x12, x10, x12\n")
+
 	builder.WriteString(fmt.Sprintf("adr x13, %s\n", labelResult))
 	builder.WriteString("str x12, [x13]\n\n")
 
