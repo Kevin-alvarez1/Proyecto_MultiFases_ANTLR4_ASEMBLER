@@ -19,6 +19,8 @@ func ProcesarDeclaracionMultiple(
 	tabla *symbols.TablaSimbolos,
 	outputASM *strings.Builder,
 ) error {
+	fmt.Println("GENERANDO DECLARACIÓN ASM DE:", ids)
+
 	for i, id := range ids {
 		valor := valores[i]
 		valorTipo := inferirTipo(valor)
@@ -203,6 +205,8 @@ func reservarVariableEnData(id string, tipo string) {
 	if variablesReservadas[id] {
 		return
 	}
+	fmt.Println("RESERVANDO EN .data:", id)
+
 	switch tipo {
 	case "int", "bool":
 		DataBuilder.WriteString(fmt.Sprintf("%s: .quad 0\n", id))
@@ -214,4 +218,33 @@ func reservarVariableEnData(id string, tipo string) {
 		DataBuilder.WriteString(fmt.Sprintf("%s: .quad 0\n", id))
 	}
 	variablesReservadas[id] = true
+}
+
+func GenerarSumaASM(id1, id2 string, builder *strings.Builder, tipo string) string {
+	labelResult := fmt.Sprintf("resultado_suma_%d", contadorSuma)
+	contadorSuma++
+
+	// Reservar variable resultado solo una vez por etiqueta
+	if !variablesReservadas[labelResult] {
+		reservarVariableEnData(labelResult, tipo)
+		variablesReservadas[labelResult] = true
+	}
+
+	// Generar código de suma, usando labelResult
+	builder.WriteString(fmt.Sprintf("\n// Suma %d\n", contadorSuma))
+	builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+	builder.WriteString("ldr x10, [x10]\n")
+	builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+	builder.WriteString("ldr x11, [x11]\n")
+	builder.WriteString("add x12, x10, x11\n")
+	builder.WriteString(fmt.Sprintf("adr x13, %s\n", labelResult))
+	builder.WriteString("str x12, [x13]\n\n")
+
+	return labelResult
+}
+
+func ReservarVariableSiNoExiste(id, tipo string) {
+	if !variablesReservadas[id] {
+		reservarVariableEnData(id, tipo)
+	}
 }

@@ -715,6 +715,35 @@ func (v *EvalVisitor) VisitExpresion(ctx *parser.ExpresionContext) interface{} {
 		}
 		return val
 	}
+	if ctx.MAS() != nil {
+		left := ctx.Expresion(0)
+		right := ctx.Expresion(1)
+
+		lid := left.GetText()
+		rid := right.GetText()
+
+		simboloL := v.Tabla.EntornoActual.BuscarSimbolo(lid)
+		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
+
+		if simboloL != nil && simboloR != nil {
+			tipo := simboloL.TipoDato
+
+			// Asegurar que estén reservadas en .data
+			traducciones.ReservarVariableSiNoExiste(lid, tipo)
+			traducciones.ReservarVariableSiNoExiste(rid, tipo)
+
+			traducciones.GenerarSumaASM(lid, rid, &traducciones.FuncionesBuilder, tipo)
+			v.OutputASM.WriteString("    bl add\n")
+			switch tipo {
+			case "float":
+				return simboloL.Valor.(float64) + simboloR.Valor.(float64)
+			case "string":
+				return simboloL.Valor.(string) + simboloR.Valor.(string)
+			default:
+				return simboloL.Valor.(int) + simboloR.Valor.(int)
+			}
+		}
+	}
 
 	if ctx.PAR1() != nil && ctx.PAR2() != nil {
 		return v.Visit(ctx.Expresion(0))
