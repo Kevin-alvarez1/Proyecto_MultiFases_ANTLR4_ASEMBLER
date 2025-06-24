@@ -150,9 +150,18 @@ func BuildMainWindow(win fyne.Window) *Editor {
 		},
 	)
 
-	for i, width := range []float32{190, 120, 100, 200, 500, 60, 70} {
-		editor.symbolTable.SetColumnWidth(i, width)
-	}
+	editor.symbolTable.SetColumnWidth(0, 100)
+	editor.symbolTable.SetColumnWidth(1, 150)
+	editor.symbolTable.SetColumnWidth(2, 100)
+	editor.symbolTable.SetColumnWidth(3, 300)
+	editor.symbolTable.SetColumnWidth(4, 400)
+	editor.symbolTable.SetColumnWidth(5, 60)
+	editor.symbolTable.SetColumnWidth(6, 60)
+
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		editor.adjustAmbitColumn()
+	}()
 	// Inicialización previa de ImageScroll e ImageContainer
 	rect := canvas.NewRectangle(color.White)
 	scroll := container.NewScroll(rect)
@@ -242,6 +251,7 @@ func BuildMainWindow(win fyne.Window) *Editor {
 			}
 
 			editor.symbolTable.Refresh()
+			editor.UpdatSymb()
 
 			// Mostrar errores si hay
 			if len(editor.errorTable.Errors) > 0 {
@@ -502,4 +512,24 @@ func (e *Editor) adjustDescriptionColumn() {
 func (e *Editor) UpdateErrors() {
 	e.errorTableUI.Refresh()
 	go e.adjustDescriptionColumn()
+}
+func (e *Editor) adjustAmbitColumn() {
+	maxWidth := float32(300)
+	for _, entorno := range e.simbolTable.EntornosFunciones {
+		for _, simbolo := range entorno.Simbolos {
+			textLen := float32(len(simbolo.Ambito)) * 7
+			if textLen > maxWidth && textLen < 300 {
+				maxWidth = textLen
+			}
+		}
+	}
+	if e.symbolTable != nil {
+		e.symbolTable.SetColumnWidth(3, maxWidth)
+		e.symbolTable.Refresh()
+	}
+}
+
+func (e *Editor) UpdatSymb() {
+	e.symbolTable.Refresh()
+	go e.adjustAmbitColumn()
 }
