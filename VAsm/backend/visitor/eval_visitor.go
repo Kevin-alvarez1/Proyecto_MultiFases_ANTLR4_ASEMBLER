@@ -1084,6 +1084,454 @@ func (v *EvalVisitor) VisitExpresion(ctx *parser.ExpresionContext) interface{} {
 		}
 	}
 
+		/*	RELACIONALES	*/
+	if ctx.DIFERENTE() != nil {
+		left := ctx.Expresion(0)
+		right := ctx.Expresion(1)
+
+		lid := left.GetText()
+		rid := right.GetText()
+
+		simboloL := v.Tabla.EntornoActual.BuscarSimbolo(lid)
+		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
+
+		if simboloL != nil && simboloR != nil {
+			tipoL := simboloL.TipoDato
+			tipoR := simboloR.TipoDato
+
+			var tipoFinal string
+			if tipoL == "float" || tipoR == "float" {
+				tipoFinal = "float"
+			} else {
+				tipoFinal = "int"
+			}
+
+			traducciones.ReservarVariableSiNoExiste(lid, tipoL)
+			traducciones.ReservarVariableSiNoExiste(rid, tipoR)
+
+			if tipoFinal == "float" {
+				if tipoL == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("// Convertir %s de int a float\n", lid))
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr x10, [x10]\n")
+					v.OutputASM.WriteString("scvtf s0, x10\n")
+				} else {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr s0, [x10]\n")
+				}
+
+				if tipoR == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("// Convertir %s de int a float\n", rid))
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("ldr x11, [x11]\n")
+					v.OutputASM.WriteString("scvtf s1, x11\n")
+				} else {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("ldr s1, [x11]\n")
+				}
+
+				v.OutputASM.WriteString("fcmp s0, s1\n")
+				v.OutputASM.WriteString("cset x0, ne\n")
+			} else {
+				v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+				v.OutputASM.WriteString("ldr x10, [x10]\n")
+				v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+				v.OutputASM.WriteString("ldr x11, [x11]\n")
+				v.OutputASM.WriteString("cmp x10, x11\n")
+				v.OutputASM.WriteString("cset x0, ne\n")
+			}
+
+			return toFloat(simboloL.Valor) != toFloat(simboloR.Valor)
+		}
+	}
+
+	if ctx.IGUALDAD() != nil {
+		left := ctx.Expresion(0)
+		right := ctx.Expresion(1)
+
+		lid := left.GetText()
+		rid := right.GetText()
+
+		simboloL := v.Tabla.EntornoActual.BuscarSimbolo(lid)
+		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
+
+		if simboloL != nil && simboloR != nil {
+			tipoL := simboloL.TipoDato
+			tipoR := simboloR.TipoDato
+
+			var tipoFinal string
+			if tipoL == "float" || tipoR == "float" {
+				tipoFinal = "float"
+			} else {
+				tipoFinal = "int"
+			}
+
+			traducciones.ReservarVariableSiNoExiste(lid, tipoL)
+			traducciones.ReservarVariableSiNoExiste(rid, tipoR)
+
+			if tipoFinal == "float" {
+				if tipoL == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("// Convertir %s de int a float\n", lid))
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr x10, [x10]\n")
+					v.OutputASM.WriteString("scvtf s0, x10\n")
+				} else {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr s0, [x10]\n")
+				}
+
+				if tipoR == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("// Convertir %s de int a float\n", rid))
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("ldr x11, [x11]\n")
+					v.OutputASM.WriteString("scvtf s1, x11\n")
+				} else {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("ldr s1, [x11]\n")
+				}
+
+				v.OutputASM.WriteString("fcmp s0, s1\n")
+				v.OutputASM.WriteString("cset x0, eq\n")
+			} else {
+				v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+				v.OutputASM.WriteString("ldr x10, [x10]\n")
+				v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+				v.OutputASM.WriteString("ldr x11, [x11]\n")
+				v.OutputASM.WriteString("cmp x10, x11\n")
+				v.OutputASM.WriteString("cset x0, eq\n")
+			}
+
+			return toFloat(simboloL.Valor) == toFloat(simboloR.Valor)
+		}
+	}
+
+	if ctx.MENIGUAL() != nil {
+		left := ctx.Expresion(0)
+		right := ctx.Expresion(1)
+
+		lid := left.GetText()
+		rid := right.GetText()
+
+		simboloL := v.Tabla.EntornoActual.BuscarSimbolo(lid)
+		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
+
+		if simboloL != nil && simboloR != nil {
+			tipoL := simboloL.TipoDato
+			tipoR := simboloR.TipoDato
+
+			var tipoFinal string
+			if tipoL == "float" || tipoR == "float" {
+				tipoFinal = "float"
+			} else {
+				tipoFinal = "int"
+			}
+
+			traducciones.ReservarVariableSiNoExiste(lid, tipoL)
+			traducciones.ReservarVariableSiNoExiste(rid, tipoR)
+
+			if tipoFinal == "float" {
+				if tipoL == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr x10, [x10]\n")
+					v.OutputASM.WriteString("scvtf s0, x10\n")
+				} else {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr s0, [x10]\n")
+				}
+
+				if tipoR == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("ldr x11, [x11]\n")
+					v.OutputASM.WriteString("scvtf s1, x11\n")
+				} else {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("ldr s1, [x11]\n")
+				}
+
+				v.OutputASM.WriteString("fcmp s0, s1\n")
+				v.OutputASM.WriteString("cset x0, le\n")
+			} else {
+				v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+				v.OutputASM.WriteString("ldr x10, [x10]\n")
+				v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+				v.OutputASM.WriteString("ldr x11, [x11]\n")
+				v.OutputASM.WriteString("cmp x10, x11\n")
+				v.OutputASM.WriteString("cset x0, le\n")
+			}
+			return toFloat(simboloL.Valor) <= toFloat(simboloR.Valor)
+		}
+	}
+
+
+	if ctx.MAYIGUAL() != nil {
+		left := ctx.Expresion(0)
+		right := ctx.Expresion(1)
+
+		lid := left.GetText()
+		rid := right.GetText()
+
+		simboloL := v.Tabla.EntornoActual.BuscarSimbolo(lid)
+		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
+
+		if simboloL != nil && simboloR != nil {
+			tipoL := simboloL.TipoDato
+			tipoR := simboloR.TipoDato
+
+			var tipoFinal string
+			if tipoL == "float" || tipoR == "float" {
+				tipoFinal = "float"
+			} else {
+				tipoFinal = "int"
+			}
+
+			traducciones.ReservarVariableSiNoExiste(lid, tipoL)
+			traducciones.ReservarVariableSiNoExiste(rid, tipoR)
+
+			if tipoFinal == "float" {
+				if tipoL == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr x10, [x10]\n")
+					v.OutputASM.WriteString("scvtf s0, x10\n")
+				} else {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr s0, [x10]\n")
+				}
+
+				if tipoR == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("ldr x11, [x11]\n")
+					v.OutputASM.WriteString("scvtf s1, x11\n")
+				} else {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("ldr s1, [x11]\n")
+				}
+
+				v.OutputASM.WriteString("fcmp s0, s1\n")
+				v.OutputASM.WriteString("cset x0, ge\n")
+			} else {
+				v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+				v.OutputASM.WriteString("ldr x10, [x10]\n")
+				v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+				v.OutputASM.WriteString("ldr x11, [x11]\n")
+				v.OutputASM.WriteString("cmp x10, x11\n")
+				v.OutputASM.WriteString("cset x0, ge\n")
+			}
+
+			return toFloat(simboloL.Valor) >= toFloat(simboloR.Valor)
+		}
+	}
+
+	if ctx.MENOR() != nil {
+		left := ctx.Expresion(0)
+		right := ctx.Expresion(1)
+
+		lid := left.GetText()
+		rid := right.GetText()
+
+		simboloL := v.Tabla.EntornoActual.BuscarSimbolo(lid)
+		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
+
+		if simboloL != nil && simboloR != nil {
+			tipoL := simboloL.TipoDato
+			tipoR := simboloR.TipoDato
+
+			var tipoFinal string
+			if tipoL == "float" || tipoR == "float" {
+				tipoFinal = "float"
+			} else {
+				tipoFinal = "int"
+			}
+
+			traducciones.ReservarVariableSiNoExiste(lid, tipoL)
+			traducciones.ReservarVariableSiNoExiste(rid, tipoR)
+
+			if tipoFinal == "float" {
+				if tipoL == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr x10, [x10]\n")
+					v.OutputASM.WriteString("scvtf s0, x10\n")
+				} else {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr s0, [x10]\n")
+				}
+
+				if tipoR == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("ldr x11, [x11]\n")
+					v.OutputASM.WriteString("scvtf s1, x11\n")
+				} else {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("ldr s1, [x11]\n")
+				}
+
+				v.OutputASM.WriteString("fcmp s0, s1\n")
+				v.OutputASM.WriteString("cset x0, lt\n")
+			} else {
+				v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+				v.OutputASM.WriteString("ldr x10, [x10]\n")
+				v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+				v.OutputASM.WriteString("ldr x11, [x11]\n")
+				v.OutputASM.WriteString("cmp x10, x11\n")
+				v.OutputASM.WriteString("cset x0, lt\n")
+			}
+
+			return toFloat(simboloL.Valor) < toFloat(simboloR.Valor)
+		}
+	}
+
+
+	if ctx.MAYOR() != nil {
+		left := ctx.Expresion(0)
+		right := ctx.Expresion(1)
+
+		lid := left.GetText()
+		rid := right.GetText()
+
+		simboloL := v.Tabla.EntornoActual.BuscarSimbolo(lid)
+		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
+
+		if simboloL != nil && simboloR != nil {
+			tipoL := simboloL.TipoDato
+			tipoR := simboloR.TipoDato
+
+			var tipoFinal string
+			if tipoL == "float" || tipoR == "float" {
+				tipoFinal = "float"
+			} else {
+				tipoFinal = "int"
+			}
+
+			traducciones.ReservarVariableSiNoExiste(lid, tipoL)
+			traducciones.ReservarVariableSiNoExiste(rid, tipoR)
+
+			if tipoFinal == "float" {
+				if tipoL == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr x10, [x10]\n")
+					v.OutputASM.WriteString("scvtf s0, x10\n")
+				} else {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+					v.OutputASM.WriteString("ldr s0, [x10]\n")
+				}
+
+				if tipoR == "int" {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("ldr x11, [x11]\n")
+					v.OutputASM.WriteString("scvtf s1, x11\n")
+				} else {
+					v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+					v.OutputASM.WriteString("ldr s1, [x11]\n")
+				}
+
+				v.OutputASM.WriteString("fcmp s0, s1\n")
+				v.OutputASM.WriteString("cset x0, gt\n")
+			} else {
+				v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+				v.OutputASM.WriteString("ldr x10, [x10]\n")
+				v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+				v.OutputASM.WriteString("ldr x11, [x11]\n")
+				v.OutputASM.WriteString("cmp x10, x11\n")
+				v.OutputASM.WriteString("cset x0, gt\n")
+			}
+
+			return toFloat(simboloL.Valor) > toFloat(simboloR.Valor)
+		}
+	}
+
+	/*	BOOLEANOS	*/
+	if ctx.DIFER() != nil {
+		expr := ctx.Expresion(0)
+		
+		id := expr.GetText()
+		simbolo := v.Tabla.EntornoActual.BuscarSimbolo(id)
+
+		if simbolo != nil {
+			if simbolo.TipoDato != "bool" {
+				return false
+			}
+			traducciones.ReservarVariableSiNoExiste(id, "bool")
+
+			v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", id))
+			v.OutputASM.WriteString("ldr x10, [x10]\n")
+
+			v.OutputASM.WriteString("cmp x10, #0\n")
+			v.OutputASM.WriteString("cset x0, eq\n")
+
+			val := simbolo.Valor.(bool)
+			return !val
+		}
+		return false
+	}
+
+	if ctx.OR() != nil {
+		left := ctx.Expresion(0)
+		right := ctx.Expresion(1)
+
+		lid := left.GetText()
+		rid := right.GetText()
+
+		simboloL := v.Tabla.EntornoActual.BuscarSimbolo(lid)
+		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
+
+		if simboloL != nil && simboloR != nil {
+			if simboloL.TipoDato != "bool" || simboloR.TipoDato != "bool" {
+				return false
+			}
+
+			traducciones.ReservarVariableSiNoExiste(lid, "bool")
+			traducciones.ReservarVariableSiNoExiste(rid, "bool")
+
+			v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+			v.OutputASM.WriteString("ldr x10, [x10]\n")
+			
+			v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+			v.OutputASM.WriteString("ldr x11, [x11]\n")
+
+			v.OutputASM.WriteString("orr x12, x10, x11\n")
+			v.OutputASM.WriteString("cmp x12, #0\n")
+			v.OutputASM.WriteString("cset x0, ne\n")
+
+			leftVal := simboloL.Valor.(bool)
+			rightVal := simboloR.Valor.(bool)
+			return leftVal || rightVal
+		}
+		return false
+	}
+	if ctx.AND() != nil {
+		left := ctx.Expresion(0)
+		right := ctx.Expresion(1)
+
+		lid := left.GetText()
+		rid := right.GetText()
+
+		simboloL := v.Tabla.EntornoActual.BuscarSimbolo(lid)
+		simboloR := v.Tabla.EntornoActual.BuscarSimbolo(rid)
+
+		if simboloL != nil && simboloR != nil {
+			if simboloL.TipoDato != "bool" || simboloR.TipoDato != "bool" {
+				return false
+			}
+
+			traducciones.ReservarVariableSiNoExiste(lid, "bool")
+			traducciones.ReservarVariableSiNoExiste(rid, "bool")
+
+			v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", lid))
+			v.OutputASM.WriteString("ldr x10, [x10]\n")
+			
+			v.OutputASM.WriteString(fmt.Sprintf("adr x11, %s\n", rid))
+			v.OutputASM.WriteString("ldr x11, [x11]\n")
+
+			v.OutputASM.WriteString("and x12, x10, x11\n")
+			v.OutputASM.WriteString("cmp x12, #0\n")
+			v.OutputASM.WriteString("cset x0, ne\n")
+
+			leftVal := simboloL.Valor.(bool)
+			rightVal := simboloR.Valor.(bool)
+			return leftVal && rightVal
+		}
+		return false
+	}
+
 	if ctx.PAR1() != nil && ctx.PAR2() != nil {
 		return v.Visit(ctx.Expresion(0))
 	}
