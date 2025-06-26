@@ -356,30 +356,262 @@ func GenerarDivisionASM(id1, id2 string, builder *strings.Builder, tipo string) 
 	return labelResult
 }
 
-func GenerarModuloASM(id1, id2 string, builder *strings.Builder) string {
-	labelResult := fmt.Sprintf("resultado_mod_%d", contadorSuma)
+func GenerarModuloASM(id1, id2 string, builder *strings.Builder, tipo1, tipo2 string) string {
+	labelResult := fmt.Sprintf("resultado_modulo_%d", contadorSuma)
 	contadorSuma++
 
 	if !variablesReservadas[labelResult] {
 		reservarVariableEnData(labelResult, "int")
 		variablesReservadas[labelResult] = true
 	}
-
 	builder.WriteString(fmt.Sprintf("\n// Módulo %d\n", contadorSuma))
+	builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+	if tipo1 == "float" {
+		builder.WriteString("ldr s0, [x10]\n")
+		builder.WriteString("fcvtzs x10, s0\n")
+	} else {
+		builder.WriteString("ldr x10, [x10]\n")
+	}
+	builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+	if tipo2 == "float" {
+		builder.WriteString("ldr s1, [x11]\n")
+		builder.WriteString("fcvtzs x11, s1\n")
+	} else {
+		builder.WriteString("ldr x11, [x11]\n")
+	}
+	builder.WriteString("sdiv x12, x10, x11\n")
+	builder.WriteString("mul x12, x12, x11\n")
+	builder.WriteString("sub x12, x10, x12\n")
+	builder.WriteString(fmt.Sprintf("adr x13, %s\n", labelResult))
+	builder.WriteString("str x12, [x13]\n")
+
+	return labelResult
+}
+
+func GenerarDiferenteASM(id1, id2 string, builder *strings.Builder, tipo1, tipo2 string) {
+	builder.WriteString(fmt.Sprintf("// Comparación != entre %s y %s\n", id1, id2))
+
+	if tipo1 == "float" || tipo2 == "float" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		if tipo1 == "int" {
+			builder.WriteString("ldr x12, [x10]\n")
+			builder.WriteString("scvtf s0, x12\n")
+		} else {
+			builder.WriteString("ldr s0, [x10]\n")
+		}
+
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		if tipo2 == "int" {
+			builder.WriteString("ldr x13, [x11]\n")
+			builder.WriteString("scvtf s1, x13\n")
+		} else {
+			builder.WriteString("ldr s1, [x11]\n")
+		}
+
+		builder.WriteString("fcmp s0, s1\n")
+		builder.WriteString("cset x0, ne\n")
+	} else {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		builder.WriteString("ldr x10, [x10]\n")
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		builder.WriteString("ldr x11, [x11]\n")
+		builder.WriteString("cmp x10, x11\n")
+		builder.WriteString("cset x0, ne\n")
+	}
+}
+
+func GenerarIgualASM(id1, id2 string, builder *strings.Builder, tipo1, tipo2 string) {
+	builder.WriteString(fmt.Sprintf("// Comparación == entre %s y %s\n", id1, id2))
+
+	if tipo1 == "float" || tipo2 == "float" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		if tipo1 == "int" {
+			builder.WriteString("ldr x12, [x10]\n")
+			builder.WriteString("scvtf s0, x12\n")
+		} else {
+			builder.WriteString("ldr s0, [x10]\n")
+		}
+
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		if tipo2 == "int" {
+			builder.WriteString("ldr x13, [x11]\n")
+			builder.WriteString("scvtf s1, x13\n")
+		} else {
+			builder.WriteString("ldr s1, [x11]\n")
+		}
+		builder.WriteString("fcmp s0, s1\n")
+		builder.WriteString("cset x0, eq\n")
+
+	} else {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		builder.WriteString("ldr x10, [x10]\n")
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		builder.WriteString("ldr x11, [x11]\n")
+		builder.WriteString("cmp x10, x11\n")
+		builder.WriteString("cset x0, eq\n")
+	}
+}
+
+func GenerarMenorIgualASM(id1, id2 string, builder *strings.Builder, tipo1, tipo2 string) {
+	builder.WriteString(fmt.Sprintf("// Comparación <= entre %s y %s\n", id1, id2))
+
+	if tipo1 == "float" || tipo2 == "float" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		if tipo1 == "int" {
+			builder.WriteString("ldr x12, [x10]\n")
+			builder.WriteString("scvtf s0, x12\n")
+		} else {
+			builder.WriteString("ldr s0, [x10]\n")
+		}
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		if tipo2 == "int" {
+			builder.WriteString("ldr x13, [x11]\n")
+			builder.WriteString("scvtf s1, x13\n")
+		} else {
+			builder.WriteString("ldr s1, [x11]\n")
+		}
+
+		builder.WriteString("fcmp s0, s1\n")
+		builder.WriteString("cset x0, le\n")
+	} else {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		builder.WriteString("ldr x10, [x10]\n")
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		builder.WriteString("ldr x11, [x11]\n")
+		builder.WriteString("cmp x10, x11\n")
+		builder.WriteString("cset x0, le\n")
+	}
+}
+
+func GenerarMayorIgualASM(id1, id2 string, builder *strings.Builder, tipo1, tipo2 string) {
+	builder.WriteString(fmt.Sprintf("// Comparación >= entre %s y %s\n", id1, id2))
+
+	if tipo1 == "float" || tipo2 == "float" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		if tipo1 == "int" {
+			builder.WriteString("ldr x12, [x10]\n")
+			builder.WriteString("scvtf s0, x12\n")
+		} else {
+			builder.WriteString("ldr s0, [x10]\n")
+		}
+
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		if tipo2 == "int" {
+			builder.WriteString("ldr x13, [x11]\n")
+			builder.WriteString("scvtf s1, x13\n")
+		} else {
+			builder.WriteString("ldr s1, [x11]\n")
+		}
+		builder.WriteString("fcmp s0, s1\n")
+		builder.WriteString("cset x0, ge\n")
+
+	} else {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		builder.WriteString("ldr x10, [x10]\n")
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		builder.WriteString("ldr x11, [x11]\n")
+		builder.WriteString("cmp x10, x11\n")
+		builder.WriteString("cset x0, ge\n")
+	}
+}
+
+func GenerarMenorASM(id1, id2 string, builder *strings.Builder, tipo1, tipo2 string) {
+	builder.WriteString(fmt.Sprintf("// Comparación < entre %s y %s\n", id1, id2))
+
+	if tipo1 == "float" || tipo2 == "float" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		if tipo1 == "int" {
+			builder.WriteString("ldr x12, [x10]\n")
+			builder.WriteString("scvtf s0, x12\n")
+		} else {
+			builder.WriteString("ldr s0, [x10]\n")
+		}
+
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		if tipo2 == "int" {
+			builder.WriteString("ldr x13, [x11]\n")
+			builder.WriteString("scvtf s1, x13\n")
+		} else {
+			builder.WriteString("ldr s1, [x11]\n")
+		}
+
+		builder.WriteString("fcmp s0, s1\n")
+		builder.WriteString("cset x0, lt\n")
+
+	} else {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		builder.WriteString("ldr x10, [x10]\n")
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		builder.WriteString("ldr x11, [x11]\n")
+		builder.WriteString("cmp x10, x11\n")
+		builder.WriteString("cset x0, lt\n")
+	}
+}
+
+func GenerarMayorASM(id1, id2 string, builder *strings.Builder, tipo1, tipo2 string) {
+	builder.WriteString(fmt.Sprintf("// Comparación > entre %s y %s\n", id1, id2))
+
+	if tipo1 == "float" || tipo2 == "float" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		if tipo1 == "int" {
+			builder.WriteString("ldr x12, [x10]\n")
+			builder.WriteString("scvtf s0, x12\n")
+		} else {
+			builder.WriteString("ldr s0, [x10]\n")
+		}
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		if tipo2 == "int" {
+			builder.WriteString("ldr x13, [x11]\n")
+			builder.WriteString("scvtf s1, x13\n")
+		} else {
+			builder.WriteString("ldr s1, [x11]\n")
+		}
+
+		builder.WriteString("fcmp s0, s1\n")
+		builder.WriteString("cset x0, gt\n")
+
+	} else {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+		builder.WriteString("ldr x10, [x10]\n")
+		builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+		builder.WriteString("ldr x11, [x11]\n")
+		builder.WriteString("cmp x10, x11\n")
+		builder.WriteString("cset x0, gt\n")
+	}
+}
+func GenerarAndASM(id1, id2 string, builder *strings.Builder) {
+	builder.WriteString(fmt.Sprintf("// Operación lógica AND entre %s && %s\n", id1, id2))
+
+	builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
+	builder.WriteString("ldr x10, [x10]\n")
+
+	builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
+	builder.WriteString("ldr x11, [x11]\n")
+
+	builder.WriteString("and x12, x10, x11\n")
+	builder.WriteString("cmp x12, #0\n")
+	builder.WriteString("cset x0, ne\n")
+}
+
+func GenerarOrASM(id1, id2 string, builder *strings.Builder) {
+	builder.WriteString(fmt.Sprintf("// Operación lógica OR entre %s || %s\n", id1, id2))
 	builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
 	builder.WriteString("ldr x10, [x10]\n")
 	builder.WriteString(fmt.Sprintf("adr x11, %s\n", id2))
 	builder.WriteString("ldr x11, [x11]\n")
-
-	builder.WriteString("sdiv x12, x10, x11\n")
-	builder.WriteString("mul x12, x12, x11\n")
-	builder.WriteString("sub x12, x10, x12\n")
-
-	builder.WriteString(fmt.Sprintf("adr x13, %s\n", labelResult))
-	builder.WriteString("str x12, [x13]\n\n")
-
-	return labelResult
+	builder.WriteString("orr x12, x10, x11\n")
+	builder.WriteString("cmp x12, #0\n")
+	builder.WriteString("cset x0, ne\n") 
 }
+
+func GenerarNotASM(id string, builder *strings.Builder) {
+	builder.WriteString(fmt.Sprintf("// Operación lógica NOT !%s\n", id))
+	builder.WriteString(fmt.Sprintf("adr x10, %s\n", id))
+	builder.WriteString("ldr x10, [x10]\n")
+	builder.WriteString("cmp x10, #0\n")
+	builder.WriteString("cset x0, eq\n")
+}
+
 
 func ReservarVariableSiNoExiste(id, tipo string) {
 	if !variablesReservadas[id] {
