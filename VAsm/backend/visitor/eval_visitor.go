@@ -665,34 +665,12 @@ func (v *EvalVisitor) VisitAsigIncre(ctx *parser.AsigIncreContext) interface{} {
 	}
 
 	traducciones.ReservarVariableSiNoExiste(id, tipoFinal)
-
-	v.OutputASM.WriteString(fmt.Sprintf("// %s += %v\n", id, valor))
+	traducciones.GenerarIncrementoASM(id, valor, tipoFinal,&traducciones.FuncionesBuilder)
+	v.OutputASM.WriteString("    bl add\n")
 
 	if tipoFinal == "float" {
-		v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", id))
-		v.OutputASM.WriteString("ldr s0, [x10]\n")
-
-		if tipoValor == "int" {
-			v.OutputASM.WriteString(fmt.Sprintf("mov x11, #%d\n", valor.(int)))
-			v.OutputASM.WriteString("scvtf s1, x11\n")
-		} else {
-			v.OutputASM.WriteString(fmt.Sprintf("ldr s1, =%g\n", valor.(float64)))
-		}
-
-		v.OutputASM.WriteString("fadd s2, s0, s1\n")
-
-		v.OutputASM.WriteString(fmt.Sprintf("adr x12, %s\n", id))
-		v.OutputASM.WriteString("str s2, [x12]\n\n")
-
 		simbolo.Valor = toFloat(simbolo.Valor) + toFloat(valor)
-
 	} else {
-		v.OutputASM.WriteString(fmt.Sprintf("adr x0, %s\n", id))
-		v.OutputASM.WriteString("ldr x0, [x0]\n")
-		v.OutputASM.WriteString(fmt.Sprintf("add x0, x0, #%d\n", valor.(int)))
-		v.OutputASM.WriteString(fmt.Sprintf("adr x1, %s\n", id))
-		v.OutputASM.WriteString("str x0, [x1]\n\n")
-
 		simbolo.Valor = simbolo.Valor.(int) + valor.(int)
 	}
 
@@ -721,38 +699,17 @@ func (v *EvalVisitor) VisitAsigDecre(ctx *parser.AsigDecreContext) interface{} {
 	}
 
 	traducciones.ReservarVariableSiNoExiste(id, tipoFinal)
-	v.OutputASM.WriteString(fmt.Sprintf("// %s -= %v\n", id, valor))
+	traducciones.GenerarDecrementoASM(id, valor, tipoFinal,&traducciones.FuncionesBuilder)
+	v.OutputASM.WriteString("    bl add\n")
 
 	if tipoFinal == "float" {
-		v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", id))
-		v.OutputASM.WriteString("ldr s0, [x10]\n")
-
-		if tipoValor == "int" {
-			v.OutputASM.WriteString(fmt.Sprintf("mov x11, #%d\n", valor.(int)))
-			v.OutputASM.WriteString("scvtf s1, x11\n")
-		} else {
-			v.OutputASM.WriteString(fmt.Sprintf("ldr s1, =%g\n", valor.(float64)))
-		}
-
-		v.OutputASM.WriteString("fsub s2, s0, s1\n")
-		v.OutputASM.WriteString(fmt.Sprintf("adr x12, %s\n", id))
-		v.OutputASM.WriteString("str s2, [x12]\n\n")
-
 		simbolo.Valor = toFloat(simbolo.Valor) - toFloat(valor)
-
 	} else {
-		v.OutputASM.WriteString(fmt.Sprintf("adr x0, %s\n", id))
-		v.OutputASM.WriteString("ldr x0, [x0]\n")
-		v.OutputASM.WriteString(fmt.Sprintf("sub x0, x0, #%d\n", valor.(int)))
-		v.OutputASM.WriteString(fmt.Sprintf("adr x1, %s\n", id))
-		v.OutputASM.WriteString("str x0, [x1]\n\n")
-
 		simbolo.Valor = simbolo.Valor.(int) - valor.(int)
 	}
 
 	return nil
 }
-
 
 // ========= EXPRESIONES =========
 func (v *EvalVisitor) VisitExpresion(ctx *parser.ExpresionContext) interface{} {

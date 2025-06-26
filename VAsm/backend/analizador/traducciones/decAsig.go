@@ -255,15 +255,15 @@ func GenerarSumaASM(id1, id2 string, builder *strings.Builder, tipo string) stri
 }
 
 func GenerarRestaASM(id1, id2 string, builder *strings.Builder, tipo string) string {
-	labelResult := fmt.Sprintf("resultado_resta_%d", contadorSuma)
-	contadorSuma++
+	labelResult := fmt.Sprintf("resultado_resta_%d", contadorResta)
+	contadorResta++
 
 	if !variablesReservadas[labelResult] {
 		reservarVariableEnData(labelResult, tipo)
 		variablesReservadas[labelResult] = true
 	}
 
-	builder.WriteString(fmt.Sprintf("\n// Resta %d\n", contadorSuma))
+	builder.WriteString(fmt.Sprintf("\n// Resta %d\n", contadorResta))
 
 	if tipo == "int" {
 		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
@@ -289,15 +289,15 @@ func GenerarRestaASM(id1, id2 string, builder *strings.Builder, tipo string) str
 }
 
 func GenerarMultiplicacionASM(id1, id2 string, builder *strings.Builder, tipo string) string {
-	labelResult := fmt.Sprintf("resultado_mul_%d", contadorSuma)
-	contadorSuma++
+	labelResult := fmt.Sprintf("resultado_mul_%d", contadorMulti)
+	contadorMulti++
 
 	if !variablesReservadas[labelResult] {
 		reservarVariableEnData(labelResult, tipo)
 		variablesReservadas[labelResult] = true
 	}
 
-	builder.WriteString(fmt.Sprintf("\n// Multiplicación %d\n", contadorSuma))
+	builder.WriteString(fmt.Sprintf("\n// Multiplicación %d\n", contadorMulti))
 
 	if tipo == "int" {
 		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
@@ -323,15 +323,15 @@ func GenerarMultiplicacionASM(id1, id2 string, builder *strings.Builder, tipo st
 }
 
 func GenerarDivisionASM(id1, id2 string, builder *strings.Builder, tipo string) string {
-	labelResult := fmt.Sprintf("resultado_div_%d", contadorSuma)
-	contadorSuma++
+	labelResult := fmt.Sprintf("resultado_div_%d", contadorDivision)
+	contadorDivision++
 
 	if !variablesReservadas[labelResult] {
 		reservarVariableEnData(labelResult, tipo)
 		variablesReservadas[labelResult] = true
 	}
 
-	builder.WriteString(fmt.Sprintf("\n// División %d\n", contadorSuma))
+	builder.WriteString(fmt.Sprintf("\n// División %d\n", contadorDivision))
 
 	if tipo == "int" {
 		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
@@ -357,14 +357,14 @@ func GenerarDivisionASM(id1, id2 string, builder *strings.Builder, tipo string) 
 }
 
 func GenerarModuloASM(id1, id2 string, builder *strings.Builder, tipo1, tipo2 string) string {
-	labelResult := fmt.Sprintf("resultado_modulo_%d", contadorSuma)
-	contadorSuma++
+	labelResult := fmt.Sprintf("resultado_modulo_%d", contadorMod)
+	contadorMod++
 
 	if !variablesReservadas[labelResult] {
 		reservarVariableEnData(labelResult, "int")
 		variablesReservadas[labelResult] = true
 	}
-	builder.WriteString(fmt.Sprintf("\n// Módulo %d\n", contadorSuma))
+	builder.WriteString(fmt.Sprintf("\n// Módulo %d\n", contadorMod))
 	builder.WriteString(fmt.Sprintf("adr x10, %s\n", id1))
 	if tipo1 == "float" {
 		builder.WriteString("ldr s0, [x10]\n")
@@ -610,6 +610,58 @@ func GenerarNotASM(id string, builder *strings.Builder) {
 	builder.WriteString("ldr x10, [x10]\n")
 	builder.WriteString("cmp x10, #0\n")
 	builder.WriteString("cset x0, eq\n")
+}
+
+func GenerarIncrementoASM(id string, valor interface{}, tipo string, builder *strings.Builder) {
+	builder.WriteString(fmt.Sprintf("// %s += %v\n", id, valor))
+
+	if tipo == "float" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id))
+		builder.WriteString("ldr s0, [x10]\n")
+
+		if intVal, ok := valor.(int); ok {
+			builder.WriteString(fmt.Sprintf("mov x11, #%d\n", intVal))
+			builder.WriteString("scvtf s1, x11\n")
+		} else if floatVal, ok := valor.(float64); ok {
+			builder.WriteString(fmt.Sprintf("ldr s1, =%g\n", floatVal))
+		}
+
+		builder.WriteString("fadd s2, s0, s1\n")
+		builder.WriteString(fmt.Sprintf("adr x12, %s\n", id))
+		builder.WriteString("str s2, [x12]\n\n")
+	} else {
+		builder.WriteString(fmt.Sprintf("adr x0, %s\n", id))
+		builder.WriteString("ldr x0, [x0]\n")
+		builder.WriteString(fmt.Sprintf("add x0, x0, #%d\n", valor.(int)))
+		builder.WriteString(fmt.Sprintf("adr x1, %s\n", id))
+		builder.WriteString("str x0, [x1]\n\n")
+	}
+}
+
+func GenerarDecrementoASM(id string, valor interface{}, tipo string, builder *strings.Builder) {
+	builder.WriteString(fmt.Sprintf("// %s -= %v\n", id, valor))
+
+	if tipo == "float" {
+		builder.WriteString(fmt.Sprintf("adr x10, %s\n", id))
+		builder.WriteString("ldr s0, [x10]\n")
+
+		if intVal, ok := valor.(int); ok {
+			builder.WriteString(fmt.Sprintf("mov x11, #%d\n", intVal))
+			builder.WriteString("scvtf s1, x11\n")
+		} else if floatVal, ok := valor.(float64); ok {
+			builder.WriteString(fmt.Sprintf("ldr s1, =%g\n", floatVal))
+		}
+
+		builder.WriteString("fsub s2, s0, s1\n")
+		builder.WriteString(fmt.Sprintf("adr x12, %s\n", id))
+		builder.WriteString("str s2, [x12]\n\n")
+	} else {
+		builder.WriteString(fmt.Sprintf("adr x0, %s\n", id))
+		builder.WriteString("ldr x0, [x0]\n")
+		builder.WriteString(fmt.Sprintf("sub x0, x0, #%d\n", valor.(int)))
+		builder.WriteString(fmt.Sprintf("adr x1, %s\n", id))
+		builder.WriteString("str x0, [x1]\n\n")
+	}
 }
 
 
