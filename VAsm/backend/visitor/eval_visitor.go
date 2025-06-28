@@ -815,6 +815,8 @@ func (v *EvalVisitor) VisitExpresion(ctx *parser.ExpresionContext) interface{} {
 		}
 		return val
 	}
+
+	/* ARITMETICAS*/
 	if ctx.MAS() != nil {
 		left := ctx.Expresion(0)
 		right := ctx.Expresion(1)
