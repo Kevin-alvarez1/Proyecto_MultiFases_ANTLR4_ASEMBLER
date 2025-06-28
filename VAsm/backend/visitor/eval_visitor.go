@@ -29,6 +29,9 @@ type Funcion struct {
 	EntornoDeDeclaracion *symbols.Entorno
 }
 
+type BreakSignal struct{}
+type ContinueSignal struct{}
+
 type Parametro struct {
 	Nombre string
 	Tipo   string
@@ -47,6 +50,7 @@ type EvalVisitor struct {
 	Tabla         *symbols.TablaSimbolos
 	Funciones     map[string][]Funcion
 	NombreEntorno string
+	IfCtrl        *If
 }
 
 var funcionesGeneradas map[string]bool
@@ -58,6 +62,7 @@ func NewEvalVisitor(tabla *symbols.TablaSimbolos) *EvalVisitor {
 		Console:              &strings.Builder{},
 		Entorno:              make(map[string]interface{}),
 		Funciones:            make(map[string][]Funcion),
+		IfCtrl:               NewIf(),
 	}
 }
 
@@ -153,6 +158,25 @@ func (v *EvalVisitor) VisitInstruccion(ctx *parser.InstruccionContext) interface
 	if ctx.AsigDecre() != nil {
 		v.Visit(ctx.AsigDecre())
 		return nil
+	}
+	if ctx.Asignacion() != nil {
+		return v.Visit(ctx.Asignacion())
+	}
+
+	if ctx.Sif() != nil {
+		return v.Visit(ctx.Sif())
+	}
+	if ctx.SSwitch() != nil {
+		return v.Visit(ctx.SSwitch())
+	}
+	if ctx.Sfor() != nil {
+		return v.Visit(ctx.Sfor())
+	}
+	if ctx.Break_() != nil {
+		return BreakSignal{}
+	}
+	if ctx.Continue_() != nil {
+		return ContinueSignal{}
 	}
 	return nil
 }
@@ -1429,4 +1453,340 @@ func ExtraerParametros(ctx parser.IListaParContext) []Parametro {
 		parametros = append(parametros, Parametro{Nombre: nombre, Tipo: tipo})
 	}
 	return parametros
+}
+
+// ASIGNACIONES
+func (v *EvalVisitor) VisitAsignacionNormal(ctx *parser.AsignacionNormalContext) interface{} {
+	id := ctx.IDENTIFICADOR().GetText()
+	valor := v.Visit(ctx.Expresion())
+
+	fmt.Printf("[DEBUG] Asignación normal: %s = %v\n", id, valor)
+
+	simbolo := v.Tabla.EntornoActual.BuscarSimbolo(id)
+	if simbolo == nil {
+		v.Tabla.Errores.NewSemanticError(ctx.GetStart(), fmt.Sprintf("Variable '%s' no declarada", id))
+		return nil
+	}
+
+	tipoSimbolo := simbolo.TipoDato
+	tipoValor := inferirTipo(valor)
+
+	var tipoFinal string
+	if tipoSimbolo == "float" || tipoValor == "float" {
+		tipoFinal = "float"
+	} else {
+		tipoFinal = "int"
+	}
+
+	traducciones.ReservarVariableSiNoExiste(id, tipoFinal)
+	v.OutputASM.WriteString(fmt.Sprintf("// %s = (expresion)\n", id))
+
+	if tipoFinal == "float" {
+		// para float, cargar el valor en s registro y almacenar
+		v.OutputASM.WriteString(fmt.Sprintf("adr x10, %s\n", id))
+
+		if tipoValor == "int" {
+			v.OutputASM.WriteString(fmt.Sprintf("mov x11, #%d\n", valor.(int)))
+			v.OutputASM.WriteString("scvtf s0, x11\n")
+		} else {
+			v.OutputASM.WriteString(fmt.Sprintf("ldr s0, =%g\n", valor.(float64)))
+		}
+
+		v.OutputASM.WriteString("str s0, [x10]\n\n")
+
+		simbolo.Valor = toFloat(valor)
+
+	} else {
+		// para int, cargar el valor en x registro y almacenar
+		v.OutputASM.WriteString(fmt.Sprintf("adr x0, %s\n", id))
+
+		if tipoValor == "int" {
+			v.OutputASM.WriteString(fmt.Sprintf("mov x1, #%d\n", valor.(int)))
+		} else {
+			// si el valor es float, hacer cast a int (si tiene sentido)
+			v.OutputASM.WriteString(fmt.Sprintf("// Casting float a int pendiente\n"))
+		}
+
+		v.OutputASM.WriteString("str x1, [x0]\n\n")
+
+		if tipoValor == "int" {
+			simbolo.Valor = valor.(int)
+		} else {
+			// si tienes que hacer cast, implementa aquí
+		}
+	}
+
+	return nil
+}
+
+// incremento
+func (v *EvalVisitor) VisitAsignacionIncremento(ctx *parser.AsignacionIncrementoContext) interface{} {
+	id := ctx.IDENTIFICADOR().GetText()
+	sim := v.Tabla.BuscarSimbolo(id)
+	if sim == nil {
+		panic("Variable no declarada: " + id)
+	}
+	if val, ok := sim.Valor.(int); ok {
+		nuevo := val + 1
+		v.Tabla.ActualizarVariable(id, nuevo)
+
+		// Reservar y generar código ASM
+		traducciones.ReservarVariableSiNoExiste(id, "int")
+		traducciones.TextBuilder.WriteString(fmt.Sprintf("    adr x10, %s\n", id))
+		traducciones.TextBuilder.WriteString("    ldr x11, [x10]\n")
+		traducciones.TextBuilder.WriteString("    add x11, x11, #1\n")
+		traducciones.TextBuilder.WriteString("    str x11, [x10]\n")
+
+		return nil
+	}
+	panic("Incremento solo válido para enteros")
+}
+
+// Decremento
+func (v *EvalVisitor) VisitAsignacionDecremento(ctx *parser.AsignacionDecrementoContext) interface{} {
+	id := ctx.IDENTIFICADOR().GetText()
+	sim := v.Tabla.BuscarSimbolo(id)
+	if sim == nil {
+		panic("Variable no declarada: " + id)
+	}
+	if val, ok := sim.Valor.(int); ok {
+		nuevo := val - 1
+		v.Tabla.ActualizarVariable(id, nuevo)
+
+		traducciones.ReservarVariableSiNoExiste(id, "int")
+		traducciones.TextBuilder.WriteString(fmt.Sprintf("    adr x10, %s\n", id))
+		traducciones.TextBuilder.WriteString("    ldr x11, [x10]\n")
+		traducciones.TextBuilder.WriteString("    sub x11, x11, #1\n")
+		traducciones.TextBuilder.WriteString("    str x11, [x10]\n")
+
+		return nil
+	}
+	panic("Decremento solo válido para enteros")
+}
+
+// IF
+func (v *EvalVisitor) GenerarCondicion(ctx parser.IExpresionContext, etiquetaFallo string) {
+	valor := v.Visit(ctx)
+
+	if b, ok := valor.(bool); ok {
+		if !b {
+			fmt.Println("Generando condición con etiqueta:", etiquetaFallo)
+			traducciones.TextBuilder.WriteString(fmt.Sprintf("    b %s\n", etiquetaFallo))
+		}
+		return
+	}
+
+	// Si es una variable booleana u operación relacional
+	id := ctx.GetText()
+	simbolo := v.Tabla.EntornoActual.BuscarSimbolo(id)
+	if simbolo != nil && simbolo.TipoDato == "bool" {
+		traducciones.ReservarVariableSiNoExiste(id, "bool")
+		traducciones.TextBuilder.WriteString(fmt.Sprintf("    adr x10, %s\n", id))
+		traducciones.TextBuilder.WriteString("    ldr x10, [x10]\n")
+		traducciones.TextBuilder.WriteString("    cmp x10, #0\n")
+		traducciones.TextBuilder.WriteString(fmt.Sprintf("    beq %s\n", etiquetaFallo))
+		return
+	}
+
+	// Si no es variable booleana, asumimos que se generó el resultado booleano en x0
+	traducciones.TextBuilder.WriteString("    cmp x0, #0\n")
+	traducciones.TextBuilder.WriteString(fmt.Sprintf("    beq %s\n", etiquetaFallo))
+}
+
+func (v *EvalVisitor) VisitBloque(ctx *parser.BloqueContext) interface{} {
+	instrucciones := ctx.AllInstruccion()
+	var resultados []interface{}
+
+	for _, instruccionCtx := range instrucciones {
+		val := v.Visit(instruccionCtx)
+
+		if _, esBreak := val.(BreakSignal); esBreak {
+			return BreakSignal{}
+		}
+		if _, esContinue := val.(ContinueSignal); esContinue {
+			return ContinueSignal{}
+		}
+
+		if list, ok := val.([]interface{}); ok {
+			if len(list) > 0 {
+				switch list[len(list)-1].(type) {
+				case BreakSignal:
+					return BreakSignal{}
+				case ContinueSignal:
+					return ContinueSignal{}
+				}
+			}
+			resultados = append(resultados, list...)
+		} else if val != nil {
+			resultados = append(resultados, val)
+		}
+	}
+
+	return resultados
+}
+
+func (v *EvalVisitor) VisitSif(ctx *parser.SifContext) interface{} {
+	return v.IfCtrl.Ejecutar(
+		func(t antlr.Tree) interface{} { return v.Visit(t.(antlr.ParseTree)) },
+		v.GenerarCondicion,
+		ctx,
+	)
+}
+func (v *EvalVisitor) VisitForCondicional(ctx *parser.ForCondicionalContext) interface{} {
+	fmt.Println("[DEBUG] Iniciando ejecución de for condicional")
+	traducciones.TextBuilder.WriteString("\n// ====== FOR CONDICIONAL ======\n")
+	for {
+		// 1. Evaluar la condición
+		condVal := v.Visit(ctx.Expresion())
+		fmt.Printf("[DEBUG] Condición del for: %v\n", condVal)
+
+		boolVal, ok := condVal.(bool)
+		if !ok {
+			v.Tabla.Errores.NewSemanticError(ctx.GetStart(), "La condición del 'for' no es booleana")
+			break
+		}
+
+		if !boolVal {
+			fmt.Println("[DEBUG] Condición falsa. Saliendo del for.")
+			break
+		}
+
+		// 2. Ejecutar el bloque
+		val := v.Visit(ctx.Bloque())
+		fmt.Println("[DEBUG] Bloque del for ejecutado.")
+
+		if list, ok := val.([]interface{}); ok {
+			if len(list) > 0 {
+				switch list[len(list)-1].(type) {
+				case BreakSignal:
+					fmt.Println("[DEBUG] Break encontrado en bloque del for.")
+					return list[:len(list)-1]
+				case ContinueSignal:
+					fmt.Println("[DEBUG] Continue encontrado en bloque del for.")
+					continue
+				}
+			}
+		} else if val != nil {
+			switch val.(type) {
+			case BreakSignal:
+				fmt.Println("[DEBUG] Break encontrado (individual) en bloque del for.")
+				break
+			case ContinueSignal:
+				fmt.Println("[DEBUG] Continue encontrado (individual) en bloque del for.")
+				continue
+			}
+		}
+	}
+
+	fmt.Println("[DEBUG] Finalizó for condicional")
+	return nil
+}
+
+func (v *EvalVisitor) VisitForClasico(ctx *parser.ForClasicoContext) interface{} {
+	return v.ejecutarForClasico(ctx)
+}
+
+func (v *EvalVisitor) ejecutarForClasico(ctx *parser.ForClasicoContext) interface{} {
+	fmt.Println("[DEBUG] Iniciando ejecución de for clásico")
+	traducciones.TextBuilder.WriteString("\n// ====== FOR CLÁSICO ======\n")
+
+	v.Visit(ctx.Asignacion(0))
+	var resultado []interface{}
+
+	for {
+		condVal := v.Visit(ctx.Expresion())
+		fmt.Printf("[DEBUG] Condición del for clásico: %v\n", condVal)
+
+		boolVal, ok := condVal.(bool)
+		if !ok {
+			panic("Condición del for clásico no es booleana")
+		}
+		if !boolVal {
+			fmt.Println("[DEBUG] Condición falsa. Saliendo del for clásico.")
+			break
+		}
+
+		val := v.Visit(ctx.Bloque())
+		fmt.Println("[DEBUG] Bloque del for clásico ejecutado.")
+
+		if list, ok := val.([]interface{}); ok && len(list) > 0 {
+			if _, isBreak := list[len(list)-1].(BreakSignal); isBreak {
+				fmt.Println("[DEBUG] Break encontrado en bloque del for clásico.")
+				resultado = append(resultado, list[:len(list)-1]...)
+				break
+			}
+			if _, isContinue := list[len(list)-1].(ContinueSignal); isContinue {
+				fmt.Println("[DEBUG] Continue encontrado en bloque del for clásico.")
+				resultado = append(resultado, list[:len(list)-1]...)
+				v.Visit(ctx.Asignacion(1))
+				continue
+			}
+			resultado = append(resultado, list...)
+		} else if _, isBreak := val.(BreakSignal); isBreak {
+			fmt.Println("[DEBUG] Break encontrado (individual) en bloque del for clásico.")
+			break
+		} else if _, isContinue := val.(ContinueSignal); isContinue {
+			fmt.Println("[DEBUG] Continue encontrado (individual) en bloque del for clásico.")
+			v.Visit(ctx.Asignacion(1))
+			continue
+		} else if val != nil {
+			resultado = append(resultado, val)
+		}
+
+		v.Visit(ctx.Asignacion(1))
+	}
+
+	fmt.Println("[DEBUG] Finalizó for clásico")
+	return resultado
+}
+
+func (v *EvalVisitor) VisitSSwitch(ctx *parser.SSwitchContext) interface{} {
+	valorSwitch := v.Visit(ctx.Expresion())
+	traducciones.TextBuilder.WriteString("\n// ====== SWITCH ======\n")
+	for _, caseCtx := range ctx.AllCaseBlock() {
+		valorCase := v.Visit(caseCtx.Expresion())
+
+		if valorSwitch == valorCase {
+			res := v.Visit(caseCtx.Instrucciones())
+
+			// Detectar break
+			if list, ok := res.([]interface{}); ok {
+				// Si el último elemento es BreakSignal, lo quita
+				if len(list) > 0 {
+					if _, isBreak := list[len(list)-1].(BreakSignal); isBreak {
+						return list[:len(list)-1]
+					}
+				}
+				return list
+			}
+
+			return res
+		}
+	}
+
+	if ctx.DefaultBlock() != nil {
+		res := v.Visit(ctx.DefaultBlock().Instrucciones())
+
+		if list, ok := res.([]interface{}); ok {
+			if len(list) > 0 {
+				if _, isBreak := list[len(list)-1].(BreakSignal); isBreak {
+					return list[:len(list)-1]
+				}
+			}
+			return list
+		}
+
+		return res
+	}
+
+	return nil
+}
+
+func (v *EvalVisitor) VisitBreak(ctx *parser.Break_Context) interface{} {
+	return BreakSignal{}
+}
+
+func (v *EvalVisitor) VisitContinue(ctx *parser.Continue_Context) interface{} {
+	fmt.Println(">>> [DEBUG] Se ejecutó CONTINUE")
+	return ContinueSignal{}
 }

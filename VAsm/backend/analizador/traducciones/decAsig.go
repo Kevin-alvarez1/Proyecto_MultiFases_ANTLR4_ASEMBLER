@@ -664,9 +664,15 @@ func GenerarDecrementoASM(id string, valor interface{}, tipo string, builder *st
 	}
 }
 
-
 func ReservarVariableSiNoExiste(id, tipo string) {
 	if !variablesReservadas[id] {
 		reservarVariableEnData(id, tipo)
 	}
+}
+
+var contadorIf int
+
+func GenerarEtiquetaUnica(prefijo string) string {
+	contadorIf++
+	return fmt.Sprintf("%s_%d", prefijo, contadorIf)
 }
