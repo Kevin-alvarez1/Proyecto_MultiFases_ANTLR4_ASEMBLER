@@ -1,96 +1,78 @@
 .data
-a: .quad 0
-b: .quad 0
-c: .quad 0
-text1: .quad 0
-String_val_text1_0: .ascii "=== COMPARACION RELACIONALES ==="
-text2: .quad 0
-String_val_text2_1: .ascii "=== BOOLEANOS DIRECTOS ==="
-t: .quad 0
-f: .quad 0
-msg_0: .ascii "=== COMPARACION RELACIONALES ===\n"
-msg_1: .ascii "false\n"
-msg_2: .ascii "true\n"
-msg_3: .ascii "=== BOOLEANOS DIRECTOS ===\n"
+puntos_while: .quad 0
+i: .quad 0
+suma1: .quad 0
+uno: .quad 0
+cinco: .quad 0
+diez: .quad 0
+msg_0: .ascii "0\n"
+msg_1: .ascii "1\n"
+msg_2: .ascii "2\n"
+msg_3: .ascii "3\n"
+msg_4: .ascii "4\n"
+msg_5: .ascii "OK suma1 == 10\n"
+msg_6: .ascii "OK i == 5\n"
 
 .global _start
 .text
 _start:
+
+// ====== FOR CONDICIONAL ======
 mov x0, #1
 adr x1, msg_0
-mov x2, #33
+mov x2, #2
 mov w8, #64
 svc #0
 
 mov x0, #1
 adr x1, msg_1
-mov x2, #6
+mov x2, #2
 mov w8, #64
 svc #0
 
 mov x0, #1
 adr x1, msg_2
-mov x2, #5
-mov w8, #64
-svc #0
-
-mov x0, #1
-adr x1, msg_2
-mov x2, #5
-mov w8, #64
-svc #0
-
-mov x0, #1
-adr x1, msg_1
-mov x2, #6
-mov w8, #64
-svc #0
-
-mov x0, #1
-adr x1, msg_2
-mov x2, #5
-mov w8, #64
-svc #0
-
-mov x0, #1
-adr x1, msg_2
-mov x2, #5
-mov w8, #64
-svc #0
-
-mov x0, #1
-adr x1, msg_2
-mov x2, #5
+mov x2, #2
 mov w8, #64
 svc #0
 
 mov x0, #1
 adr x1, msg_3
-mov x2, #27
+mov x2, #2
 mov w8, #64
 svc #0
 
 mov x0, #1
-adr x1, msg_1
-mov x2, #6
+adr x1, msg_4
+mov x2, #2
 mov w8, #64
 svc #0
 
+
+//  ====== IF ====== 1
+mov x0, #1
+adr x1, msg_5
+mov x2, #15
+mov w8, #64
+svc #0
+
+if_1_else:
+
+if_1_end:
+
+//  ====== IF ====== 2
+mov x0, #1
+adr x1, msg_6
+mov x2, #10
+mov w8, #64
+svc #0
+
+if_2_else:
+
+if_2_end:
 mov x0, #1
 adr x1, msg_2
-mov x2, #5
-mov w8, #64
-svc #0
-
-mov x0, #1
-adr x1, msg_1
-mov x2, #6
-mov w8, #64
-svc #0
-
-mov x0, #1
-adr x1, msg_2
-mov x2, #5
+mov x2, #2
 mov w8, #64
 svc #0
 
@@ -98,84 +80,59 @@ svc #0
     mov x8, #93
     svc #0
 
-// Comparación == entre a y b
-adr x10, a
+// Comparación < entre i y cinco
+adr x10, i
 ldr x10, [x10]
-adr x11, b
-ldr x11, [x11]
-cmp x10, x11
-cset x0, eq
-// Comparación == entre a y c
-adr x10, a
-ldr x10, [x10]
-adr x11, c
-ldr x11, [x11]
-cmp x10, x11
-cset x0, eq
-// Comparación != entre a y b
-adr x10, a
-ldr x10, [x10]
-adr x11, b
-ldr x11, [x11]
-cmp x10, x11
-cset x0, ne
-// Comparación > entre b y a
-adr x10, b
-ldr x10, [x10]
-adr x11, a
-ldr x11, [x11]
-cmp x10, x11
-cset x0, gt
-// Comparación < entre b y a
-adr x10, b
-ldr x10, [x10]
-adr x11, a
+adr x11, cinco
 ldr x11, [x11]
 cmp x10, x11
 cset x0, lt
-// Comparación >= entre a y c
-adr x10, a
+// Comparación < entre i y cinco
+adr x10, i
 ldr x10, [x10]
-adr x11, c
+adr x11, cinco
 ldr x11, [x11]
 cmp x10, x11
-cset x0, ge
-// Comparación <= entre b y c
-adr x10, b
+cset x0, lt
+// Comparación < entre i y cinco
+adr x10, i
 ldr x10, [x10]
-adr x11, c
+adr x11, cinco
 ldr x11, [x11]
 cmp x10, x11
-cset x0, le
-// Operación lógica AND entre t && f
-adr x10, t
+cset x0, lt
+// Comparación < entre i y cinco
+adr x10, i
 ldr x10, [x10]
-adr x11, f
+adr x11, cinco
 ldr x11, [x11]
-and x12, x10, x11
-cmp x12, #0
-cset x0, ne
-// Operación lógica OR entre t || f
-adr x10, t
+cmp x10, x11
+cset x0, lt
+// Comparación < entre i y cinco
+adr x10, i
 ldr x10, [x10]
-adr x11, f
+adr x11, cinco
 ldr x11, [x11]
-orr x12, x10, x11
-cmp x12, #0
-cset x0, ne
-// Operación lógica OR entre f || f
-adr x10, f
+cmp x10, x11
+cset x0, lt
+// Comparación < entre i y cinco
+adr x10, i
 ldr x10, [x10]
-adr x11, f
+adr x11, cinco
 ldr x11, [x11]
-orr x12, x10, x11
-cmp x12, #0
-cset x0, ne
-// Operación lógica AND entre t && t
-adr x10, t
+cmp x10, x11
+cset x0, lt
+// Comparación == entre suma1 y diez
+adr x10, suma1
 ldr x10, [x10]
-adr x11, t
+adr x11, diez
 ldr x11, [x11]
-and x12, x10, x11
-cmp x12, #0
-cset x0, ne
+cmp x10, x11
+cset x0, eq
+// Comparación == entre i y cinco
+adr x10, i
+ldr x10, [x10]
+adr x11, cinco
+ldr x11, [x11]
+cmp x10, x11
+cset x0, eq

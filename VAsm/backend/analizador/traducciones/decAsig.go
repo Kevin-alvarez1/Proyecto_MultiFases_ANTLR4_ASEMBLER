@@ -601,7 +601,7 @@ func GenerarOrASM(id1, id2 string, builder *strings.Builder) {
 	builder.WriteString("ldr x11, [x11]\n")
 	builder.WriteString("orr x12, x10, x11\n")
 	builder.WriteString("cmp x12, #0\n")
-	builder.WriteString("cset x0, ne\n") 
+	builder.WriteString("cset x0, ne\n")
 }
 
 func GenerarNotASM(id string, builder *strings.Builder) {
@@ -612,9 +612,15 @@ func GenerarNotASM(id string, builder *strings.Builder) {
 	builder.WriteString("cset x0, eq\n")
 }
 
-
 func ReservarVariableSiNoExiste(id, tipo string) {
 	if !variablesReservadas[id] {
 		reservarVariableEnData(id, tipo)
 	}
+}
+
+var contadorIf int
+
+func GenerarEtiquetaUnica(prefijo string) string {
+	contadorIf++
+	return fmt.Sprintf("%s_%d", prefijo, contadorIf)
 }
