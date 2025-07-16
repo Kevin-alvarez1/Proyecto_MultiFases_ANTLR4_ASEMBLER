@@ -11,6 +11,10 @@ var TextBuilder strings.Builder
 var mensajesUnicos = make(map[string]string)
 var FuncionesBuilder strings.Builder
 var contadorSuma int = 0
+var contadorResta int = 0
+var contadorDivision int = 0
+var contadorMulti int = 0
+var contadorMod int = 0
 
 func GenerarCodigoPrint(msg string, addNewline bool) {
 	if addNewline {
@@ -57,4 +61,10 @@ func ResetearCodigoASM() {
 	FuncionesBuilder.Reset()
 	variablesReservadas = make(map[string]bool)
 	contadorSuma = 0
+}
+
+func ContadorEtiqueta() int {
+	actual := contadorEtiqueta
+	contadorEtiqueta++
+	return actual
 }
