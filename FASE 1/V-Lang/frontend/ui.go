@@ -1,11 +1,6 @@
 package frontend
 
 import (
-	compiler "VAsm/backend/analizador/parser"
-	"VAsm/backend/visitor"
-	"VAsm/frontend/cst"
-	"VAsm/frontend/errors"
-	"VAsm/frontend/symbols"
 	"bytes"
 	"fmt"
 	"image/color"
@@ -16,6 +11,11 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	compiler "vlang/backend/analizador/parser"
+	"vlang/backend/visitor"
+	"vlang/frontend/cst"
+	"vlang/frontend/errors"
+	"vlang/frontend/symbols"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -150,18 +150,9 @@ func BuildMainWindow(win fyne.Window) *Editor {
 		},
 	)
 
-	editor.symbolTable.SetColumnWidth(0, 100)
-	editor.symbolTable.SetColumnWidth(1, 150)
-	editor.symbolTable.SetColumnWidth(2, 100)
-	editor.symbolTable.SetColumnWidth(3, 300)
-	editor.symbolTable.SetColumnWidth(4, 400)
-	editor.symbolTable.SetColumnWidth(5, 60)
-	editor.symbolTable.SetColumnWidth(6, 60)
-
-	go func() {
-		time.Sleep(300 * time.Millisecond)
-		editor.adjustAmbitColumn()
-	}()
+	for i, width := range []float32{190, 120, 100, 200, 500, 60, 70} {
+		editor.symbolTable.SetColumnWidth(i, width)
+	}
 	// Inicialización previa de ImageScroll e ImageContainer
 	rect := canvas.NewRectangle(color.White)
 	scroll := container.NewScroll(rect)
@@ -251,7 +242,6 @@ func BuildMainWindow(win fyne.Window) *Editor {
 			}
 
 			editor.symbolTable.Refresh()
-			editor.UpdatSymb()
 
 			// Mostrar errores si hay
 			if len(editor.errorTable.Errors) > 0 {
@@ -263,7 +253,6 @@ func BuildMainWindow(win fyne.Window) *Editor {
 			result := editor.Visitor.Visit(tree)
 			output := editor.Visitor.Console.String()
 			output = strings.TrimSpace(output)
-
 			tmpSVG, err := os.CreateTemp("", "cst_*.svg")
 			if err != nil {
 				log.Println("Error creando archivo temporal SVG:", err)
@@ -288,7 +277,7 @@ func BuildMainWindow(win fyne.Window) *Editor {
 			tmpPNG.Close()
 			// descomentar aqui para calificacion
 
-/*			// 3. Convertir SVG a PNG usando rsvg-convert (debes tenerlo instalado)
+			// 3. Convertir SVG a PNG usando rsvg-convert (debes tenerlo instalado)
 			cmd := exec.Command("rsvg-convert", "-o", tmpPNG.Name(), tmpSVG.Name())
 			err = cmd.Run()
 			if err != nil {
@@ -304,35 +293,16 @@ func BuildMainWindow(win fyne.Window) *Editor {
 			editor.ImageScroll.Content = pngImage
 			editor.ImageScroll.Refresh()
 
-			// cerrar comentario para calificacion arriba linea 295*/
+			// cerrar comentario para calificacion arriba linea 295
 			var texto string
 			if resultados, ok := result.([]interface{}); ok {
 				for _, v := range resultados {
 					texto += fmt.Sprintf("%v ", v)
 				}
 				texto = strings.TrimSpace(texto)
-				editor.ConsoleLabel.SetText(fmt.Sprintf("%s", output))
-				err = os.MkdirAll("assembler", os.ModePerm)
-				if err != nil {
-					log.Println("Error creando carpeta 'assembler':", err)
-					return
-				}
-
-				archivo := filepath.Join("assembler", "program.s")
-				file, err := os.Create(archivo)
-				if err != nil {
-					log.Println("Error creando archivo program.s:", err)
-					return
-				}
-				defer file.Close()
-
-				_, err = file.WriteString(editor.ConsoleLabel.Text)
-				if err != nil {
-					log.Println("Error escribiendo en archivo program.s:", err)
-					return
-				}
+				editor.ConsoleLabel.SetText(fmt.Sprintf("Análisis completado\n%s", output))
 			} else {
-				editor.ConsoleLabel.SetText(fmt.Sprintf("%s", output))
+				editor.ConsoleLabel.SetText(fmt.Sprintf("Análisis completado\n%s", output))
 			}
 		}),
 	)
@@ -512,24 +482,4 @@ func (e *Editor) adjustDescriptionColumn() {
 func (e *Editor) UpdateErrors() {
 	e.errorTableUI.Refresh()
 	go e.adjustDescriptionColumn()
-}
-func (e *Editor) adjustAmbitColumn() {
-	maxWidth := float32(300)
-	for _, entorno := range e.simbolTable.EntornosFunciones {
-		for _, simbolo := range entorno.Simbolos {
-			textLen := float32(len(simbolo.Ambito)) * 7
-			if textLen > maxWidth && textLen < 300 {
-				maxWidth = textLen
-			}
-		}
-	}
-	if e.symbolTable != nil {
-		e.symbolTable.SetColumnWidth(3, maxWidth)
-		e.symbolTable.Refresh()
-	}
-}
-
-func (e *Editor) UpdatSymb() {
-	e.symbolTable.Refresh()
-	go e.adjustAmbitColumn()
 }

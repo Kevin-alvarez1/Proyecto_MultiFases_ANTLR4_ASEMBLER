@@ -62,3 +62,9 @@ func ResetearCodigoASM() {
 	variablesReservadas = make(map[string]bool)
 	contadorSuma = 0
 }
+
+func ContadorEtiqueta() int {
+	actual := contadorEtiqueta
+	contadorEtiqueta++
+	return actual
+}
